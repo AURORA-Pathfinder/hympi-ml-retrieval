@@ -7,10 +7,12 @@ from tensorflow.keras.models import Model
 
 from preprocessing.DataArray import DataArray
 
+
 # A basic representation of input and output data in machine learning application
 class ModelIO(BaseModel):
     features: List[DataArray]
     target: DataArray
+    latlon: np.ndarray
 
     # pydantic config, allows use of ndarray as a type hint
     class Config:
@@ -43,5 +45,5 @@ class ModelIO(BaseModel):
         pred = self.target.transformer.inverse_transform(pred) # transforms predicted target based on target transformer
 
         truth = self.target.data # note this is the original data (not transformed)
-        
+
         return (pred, truth)

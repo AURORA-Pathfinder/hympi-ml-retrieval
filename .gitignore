@@ -1,5 +1,7 @@
 __pycache__/
 temp/
+mlruns/
+outputs/
 *.npy
 *.npz
 *.h5

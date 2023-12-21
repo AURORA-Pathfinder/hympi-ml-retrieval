@@ -37,19 +37,23 @@ class SizeSplitter(Splitter):
         return (data[train_indices], data[test_indices])
 
 # Creates the split by loading data and slicing it based on indices from a file path
+# Now with latlon abilities
 class FileSplitter(Splitter):
     def __init__(self, data_loader: DataLoader, indices_path: str) -> None:
         self.data_loader = data_loader
         self.indices_path = indices_path
-    
-    def get_train_test_split(self, dataName: DataName) -> (ndarray, ndarray):
+
+    def get_train_test_split(self, dataName: DataName) -> (ndarray, ndarray,
+                                                           ndarray, ndarray):
         data = self.data_loader.get_data(dataName)
+        latlon = self.data_loader.get_data(DataName.LatLon)
 
         with open(self.indices_path, 'rb') as f:
             split = pickle.load(f)
             (train_indices, test_indices) = (split["train_indices"], split["test_indices"])
-        
-        return (data[train_indices], data[test_indices])
+
+        return (data[train_indices], data[test_indices],
+                latlon[train_indices], latlon[test_indices])
 
 
 # Creates the split by loading train and test data separately

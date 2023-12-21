@@ -1,10 +1,15 @@
 from mlflow import ActiveRun, log_metric
 import numpy as np
 
+
 # the base evaluate class, computes some basic evaluation metrics
 class Evaluator():
-    def set_current_run(self, current_run: ActiveRun = None):
+    def set_current_run(self, current_run: ActiveRun, nfo: dict):
         self.current_run = current_run
+
+        # TODO Get all the stuff in here
+        self.config_name = nfo["name"]
+
 
     # performs any kind of evaluation based on predicted values
     # By default, this performs a simple MAE and MSE metric calculation and logs it
