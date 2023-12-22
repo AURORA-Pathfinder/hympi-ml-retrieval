@@ -58,7 +58,7 @@ class ProfileEvaluator(Evaluator):
     def generate_netcdf(self, pred: ndarray, truth: ndarray, latlon: ndarray, name_prefix: str):
         # TODO: Implement this!
         # TODO need ot figure out lat/lon
-        fname = f"{name_prefix}_{self.current_run}.nc"
+        fname = f"{name_prefix}_{self.config_name}_{self.current_run}.nc"
         fn = f"{self.nc_path}/{fname}"
 
         with netCDF4.Dataset(fn, 'w', format='NETCDF4') as nc:
