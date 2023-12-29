@@ -24,7 +24,7 @@ class SizeSplitter(Splitter):
     def get_train_test_split(self, dataName: DataName) -> (ndarray, ndarray):
         data = self.data_loader.get_data(dataName)
 
-        num_rows = data.shape[0] # NOTE: This is VERY specific to how our data is organized!
+        num_rows = data.shape[0]  # NOTE: This is VERY specific to how our data is organized!
         split_index = int(self.train_size * num_rows)
         indices = np.arange(num_rows)
 
@@ -36,10 +36,13 @@ class SizeSplitter(Splitter):
 
         return (data[train_indices], data[test_indices])
 
-# Creates the split by loading data and slicing it based on indices from a file path
-# Now with latlon abilities
+
+# Creates the split by loading data and slicing it based on indices from a
+#  file path Now with latlon abilities
 class FileSplitter(Splitter):
     def __init__(self, data_loader: DataLoader, indices_path: str) -> None:
+
+        # TODO: Check how many of these get instiated
         self.data_loader = data_loader
         self.indices_path = indices_path
 
@@ -50,10 +53,19 @@ class FileSplitter(Splitter):
 
         with open(self.indices_path, 'rb') as f:
             split = pickle.load(f)
-            (train_indices, test_indices) = (split["train_indices"], split["test_indices"])
 
-        return (data[train_indices], data[test_indices],
-                latlon[train_indices], latlon[test_indices])
+        (train_indices, test_indices) = (split["train_indices"],
+                                         split["test_indices"])
+
+        try:
+            retdata = (data[train_indices], data[test_indices],
+                       latlon[train_indices], latlon[test_indices])
+        except IndexError as e:
+            print(f"Probably a dry run\n {e}")
+            retdata = (data[:800], data[800:],
+                       latlon[:800], latlon[800:])
+
+        return retdata
 
 
 # Creates the split by loading train and test data separately

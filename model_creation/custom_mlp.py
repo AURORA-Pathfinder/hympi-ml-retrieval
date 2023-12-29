@@ -4,6 +4,7 @@ from typing import List
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, Dropout, Concatenate, Flatten
 
+
 # data for a multi-layer perceptron
 # note: dropout_rate is has a default value that is low enough that it is the same as not having a dropout at all
 class MLPData:
@@ -13,8 +14,11 @@ class MLPData:
         self.output_activation = output_activation
         self.dropout_rate = dropout_rate
 
-# builds the layers for an MLP in the functional model and returns a tuple in form of (input layer, final layer)
-# If an output_activation is defined in the data, the output layer will not have dropout and will use that activation
+
+# builds the layers for an MLP in the functional model and returns a tuple in
+#  form of (input layer, final layer)
+# If an output_activation is defined in the data, the output layer will not
+#  have dropout and will use that activation
 # otherwise, all layers will use the activation with the dropout_rate
 def build_mlp_layers(mlp_data: MLPData):
     is_output = mlp_data.output_activation != None
