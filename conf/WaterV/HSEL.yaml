@@ -6,7 +6,7 @@ verbose: True
 config:
   _target_: conf.config.Config
 
-  mlflow_experiment_name: Extensive New Loss Test
+  mlflow_experiment_name: Water Vapor Trop
   dataset_name: HSEL
 
   modelIOs:
@@ -35,7 +35,7 @@ config:
 
     target_processor:
       _target_: preprocessing.DataPreprocessor.DataPreprocessor
-      dataName: Temperature
+      dataName: Water_Vapor
       transformer:
         _target_: sklearn.preprocessing.RobustScaler
       splitter: ${splitter}
@@ -45,19 +45,19 @@ config:
     _target_: model_creation.custom_mlp.build_multipath_mlp_model
     path_mlp_datas:
       - _target_: model_creation.mlp.MLPData
-        layer_sizes: [1957, 64, 32]
-        activation: gelu
+        layer_sizes: [1957, 256, 128, 128, 64]
+        activation: relu
         dropout_rate: 0.2
 
       - _target_: model_creation.mlp.MLPData
         layer_sizes: [1]
-        activation: gelu
+        activation: relu
         dropout_rate: 0.2
 
     output_mlp_data:
       _target_: model_creation.mlp.MLPData
-      layer_sizes: [128, 64, 72]
-      activation: gelu
+      layer_sizes: [256, 128, 128, 72, 72, 72]
+      activation: relu
       output_activation: linear
       dropout_rate: 0.2
 
@@ -70,13 +70,13 @@ config:
 
   fit_args:
     batch_size: 16384
-    epochs: 1000
+    epochs: 10000
     validation_split: 0.1
     verbose: 1
     callbacks:
       - _target_: keras.callbacks.EarlyStopping
         monitor: val_loss
-        patience: 25
+        patience: 100
         verbose: ${verbose}
 
   evaluator:
@@ -88,8 +88,8 @@ splitter:
   _target_: preprocessing.splitters.FileSplitter
   data_loader:
     _target_: preprocessing.DataLoader.DataLoader
-    file_path: /data/nature_run/work/data/bt_bslcpl532_all_72sigma_v2.npz
+    file_path: /data/nature_run/work/data/bt_bslcpl532_all_72sigma_trop.npz
     dry_run: ${dry_run}
-  indices_path: /data/nature_run/work/train_test_split.pkl
+  indices_path: /data/nature_run/work/train_test_split_trop.pkl
 
 #dry_run: True

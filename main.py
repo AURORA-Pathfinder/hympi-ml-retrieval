@@ -1,25 +1,26 @@
 import hydra
+from hydra.core.hydra_config import HydraConfig
 from mlflow_logging import start_run, log_config, log_dataset, end_run
 from omegaconf import DictConfig
 from conf.config import Config
+from model_creation.loss import weighted_mae
 
 import os
-import sys
 
 # TODO get best gpu by function
 os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
 
-config_path = "conf/Temperature Profile"
-
-if len(sys.argv) > 1:
-    config_name = sys.argv[1]
-else:
-    config_name = "ATMS+BSL"
+config_path = "conf/WaterV"
+config_name = ""
 
 
 @hydra.main(config_path=config_path, config_name=config_name, version_base=None)
 def main(cfg: DictConfig):
+    hydra_cfg = HydraConfig.get()
+    config_name = hydra_cfg['job']['config_name']
+
+    print(cfg)
 
     print(f"Starting overall run {config_name}, from {config_path}")
 
@@ -38,9 +39,11 @@ def main(cfg: DictConfig):
     print("Logging datasets...")
     log_dataset(config.dataset_name, "train", trainIO)
 
+    # TODO Figure this out for config
+    # config.model.compile(**config.compile_args)
+    #config.model.compile(optimizer='adam', loss=weighted_mae)
+    config.model.compile(optimizer='adam', loss="mae")
     config.model.summary()
-
-    config.model.compile(**config.compile_args)
 
     trainIO.fit_model(config.model, config.fit_args)
 
@@ -49,17 +52,20 @@ def main(cfg: DictConfig):
     config.evaluator.set_current_run(current_run, config_dict)
 
     # test eval
-    (test_pred, test_truth) = testIO.predict_model(config.model)
+
+    (test_pred, test_truth, test_surf) = testIO.predict_model(config.model)
+    print(dir(test_surf))
     config.evaluator.evaluate(test_pred, test_truth, testIO.latlon,
-                              "test", config.evaluator.show_plot)
+                              test_surf.data, "test", config.evaluator.show_plot)
 
     # train eval
-    (train_pred, train_truth) = trainIO.predict_model(config.model)
+    (train_pred, train_truth, train_surf) = trainIO.predict_model(config.model)
     config.evaluator.evaluate(train_pred, train_truth, trainIO.latlon,
-                              "train", config.evaluator.show_plot)
+                              train_surf.data, "train", config.evaluator.show_plot)
 
     print("Run complete!")
 
+    # ml_flow method
     end_run()
 
 

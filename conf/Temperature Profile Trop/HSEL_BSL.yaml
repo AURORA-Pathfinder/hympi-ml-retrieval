@@ -6,8 +6,8 @@ verbose: True
 config:
   _target_: conf.config.Config
 
-  mlflow_experiment_name: Extensive New Loss Test
-  dataset_name: HSEL
+  mlflow_experiment_name: Extensive New Loss Test Tropics
+  dataset_name: HSEL+BSL
 
   modelIOs:
     _target_: preprocessing.DataPreprocessor.create_modelIOs
@@ -27,11 +27,11 @@ config:
           _target_: sklearn.preprocessing.RobustScaler
         splitter: ${splitter}
 
-      #- _target_: preprocessing.DataPreprocessor.DataPreprocessor
-      #  dataName: HA
-      #  transformer:
-      #    _target_: sklearn.preprocessing.RobustScaler
-      #  splitter: ${splitter}
+      - _target_: preprocessing.DataPreprocessor.DataPreprocessor
+        dataName: BSL
+        transformer:
+          _target_: sklearn.preprocessing.RobustScaler
+        splitter: ${splitter}
 
     target_processor:
       _target_: preprocessing.DataPreprocessor.DataPreprocessor
@@ -45,7 +45,7 @@ config:
     _target_: model_creation.custom_mlp.build_multipath_mlp_model
     path_mlp_datas:
       - _target_: model_creation.mlp.MLPData
-        layer_sizes: [1957, 64, 32]
+        layer_sizes: [1957, 64, 64, 32]
         activation: gelu
         dropout_rate: 0.2
 
@@ -54,9 +54,14 @@ config:
         activation: gelu
         dropout_rate: 0.2
 
+      - _target_: model_creation.mlp.MLPData
+        layer_sizes: [733, 128, 128, 64, 32]
+        activation: gelu
+        dropout_rate: 0.2
+
     output_mlp_data:
       _target_: model_creation.mlp.MLPData
-      layer_sizes: [128, 64, 72]
+      layer_sizes: [64, 64, 64, 72]
       activation: gelu
       output_activation: linear
       dropout_rate: 0.2
@@ -66,7 +71,6 @@ config:
       _target_: tensorflow.keras.optimizers.Adam
     loss:
       _target_: tensorflow.keras.losses.MeanAbsoluteError
-      #_target_: model_creation.loss.weighted_mae
 
   fit_args:
     batch_size: 16384
@@ -88,8 +92,8 @@ splitter:
   _target_: preprocessing.splitters.FileSplitter
   data_loader:
     _target_: preprocessing.DataLoader.DataLoader
-    file_path: /data/nature_run/work/data/bt_bslcpl532_all_72sigma_v2.npz
+    file_path: /data/nature_run/work/data/bt_bslcpl532_all_72sigma_trop.npz
     dry_run: ${dry_run}
-  indices_path: /data/nature_run/work/train_test_split.pkl
+  indices_path: /data/nature_run/work/train_test_split_trop.pkl
 
 #dry_run: True

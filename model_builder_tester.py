@@ -23,7 +23,25 @@ def main(cfg: DictConfig):
 
     config: Config = hydra.utils.instantiate(cfg.config)
 
+    # netcdf evaluator now built into the system
+    # Dry run mode... able to test various configuration quickly
+    # built dataset, 8640 nature run, 3619 level 1 (per)
+    #  Probably only generated rad data for naturerun files that have data in them
+
+    # TODO Surface Pressure
+    # TODO Migrate to new dataset
+    # TODO Loss Function - related to dry run modes
+    # TODO Data science
+
     config.model.summary()
+
+    # Investigate modelIOs
+    print(type(config.modelIOs), len(config.modelIOs))
+
+    feature_processor = config.modelIOs[0]
+
+    # datarray
+    print(feature_processor.features[-1].shape)
 
     # config.model.compile(**config.compile_args)
 

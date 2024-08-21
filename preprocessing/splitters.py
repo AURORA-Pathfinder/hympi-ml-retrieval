@@ -49,6 +49,11 @@ class FileSplitter(Splitter):
     def get_train_test_split(self, dataName: DataName) -> (ndarray, ndarray,
                                                            ndarray, ndarray):
         data = self.data_loader.get_data(dataName)
+
+        if data.ndim == 1:
+            print(f"Fixing dimensions on {dataName}")
+            data = data.reshape(-1, 1)
+
         latlon = self.data_loader.get_data(DataName.LatLon)
 
         with open(self.indices_path, 'rb') as f:

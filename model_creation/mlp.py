@@ -28,7 +28,7 @@ def build_mlp_layers(mlp_data: MLPData):
         sizes = mlp_data.layer_sizes[1:]
 
     for size in sizes:
-        final_layer = Dropout(mlp_data.dropout_rate)(Dense(size, mlp_data.activation)(final_layer))
+        final_layer = Dropout(mlp_data.dropout_rate)(Dense(size, mlp_data.activation, kernel_regularizer='l1')(final_layer))
 
     if is_output:
         output_size = mlp_data.layer_sizes[-1]
@@ -54,7 +54,7 @@ def build_multipath_mlp_model(path_mlp_datas: List[MLPData], output_mlp_data: ML
     output = Flatten()(output)
 
     for size in output_mlp_data.layer_sizes[0:-1]:
-        output = Dropout(output_mlp_data.dropout_rate)(Dense(size, output_mlp_data.activation)(output))
+        output = Dropout(output_mlp_data.dropout_rate)(Dense(size, output_mlp_data.activation, kernel_regularizer='l1')(output))
 
     output_size = output_mlp_data.layer_sizes[-1]
     output = Dense(output_size, output_mlp_data.output_activation)(output)

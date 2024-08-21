@@ -6,8 +6,8 @@ verbose: True
 config:
   _target_: conf.config.Config
 
-  mlflow_experiment_name: Extensive New Loss Test
-  dataset_name: HSEL
+  mlflow_experiment_name: Water Vapor Trop
+  dataset_name: ATMS_HA
 
   modelIOs:
     _target_: preprocessing.DataPreprocessor.create_modelIOs
@@ -16,7 +16,7 @@ config:
 
     feature_processors:
       - _target_: preprocessing.DataPreprocessor.DataPreprocessor
-        dataName: HyMPI_Composite
+        dataName: ATMS
         transformer:
           _target_: sklearn.preprocessing.RobustScaler
         splitter: ${splitter}
@@ -27,15 +27,15 @@ config:
           _target_: sklearn.preprocessing.RobustScaler
         splitter: ${splitter}
 
-      #- _target_: preprocessing.DataPreprocessor.DataPreprocessor
-      #  dataName: HA
-      #  transformer:
-      #    _target_: sklearn.preprocessing.RobustScaler
-      #  splitter: ${splitter}
+      - _target_: preprocessing.DataPreprocessor.DataPreprocessor
+        dataName: HyMPI_a
+        transformer:
+          _target_: sklearn.preprocessing.RobustScaler
+        splitter: ${splitter}
 
     target_processor:
       _target_: preprocessing.DataPreprocessor.DataPreprocessor
-      dataName: Temperature
+      dataName: Water_Vapor
       transformer:
         _target_: sklearn.preprocessing.RobustScaler
       splitter: ${splitter}
@@ -45,12 +45,17 @@ config:
     _target_: model_creation.custom_mlp.build_multipath_mlp_model
     path_mlp_datas:
       - _target_: model_creation.mlp.MLPData
-        layer_sizes: [1957, 64, 32]
+        layer_sizes: [22, 64, 32]
         activation: gelu
         dropout_rate: 0.2
 
       - _target_: model_creation.mlp.MLPData
         layer_sizes: [1]
+        activation: gelu
+        dropout_rate: 0.2
+
+      - _target_: model_creation.mlp.MLPData
+        layer_sizes: [482, 64, 32]
         activation: gelu
         dropout_rate: 0.2
 
@@ -76,7 +81,7 @@ config:
     callbacks:
       - _target_: keras.callbacks.EarlyStopping
         monitor: val_loss
-        patience: 25
+        patience: 15
         verbose: ${verbose}
 
   evaluator:
@@ -88,8 +93,8 @@ splitter:
   _target_: preprocessing.splitters.FileSplitter
   data_loader:
     _target_: preprocessing.DataLoader.DataLoader
-    file_path: /data/nature_run/work/data/bt_bslcpl532_all_72sigma_v2.npz
+    file_path: /data/nature_run/work/data/bt_bslcpl532_all_72sigma_trop.npz
     dry_run: ${dry_run}
-  indices_path: /data/nature_run/work/train_test_split.pkl
+  indices_path: /data/nature_run/work/train_test_split_trop.pkl
 
 #dry_run: True

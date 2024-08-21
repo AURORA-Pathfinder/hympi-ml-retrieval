@@ -19,19 +19,19 @@ class ProfileEvaluator(Evaluator):
             self.nc_path = net_cdf
 
     def evaluate(self, pred: ndarray, truth: ndarray, latlon: ndarray,
-                 name_prefix: str, show_plot: bool):
+                 surface_pressure: ndarray, name_prefix: str, show_plot: bool):
         super().evaluate(pred, truth, name_prefix)
 
         self.log_mae_per_level(pred, truth, name_prefix)
         self.log_pred_vs_true(pred, truth, index=0, name_prefix=name_prefix)
 
         if self.nc_gen:
-            self.generate_netcdf(pred, truth, latlon, name_prefix)
+            self.generate_netcdf(pred, truth, latlon, surface_pressure, name_prefix)
 
     def log_mae_per_level(self, pred: ndarray, truth: ndarray, name_prefix: str):
         error = pred - truth
         error_fig = plt.figure()
-        plt.plot([np.average(np.abs(error[:,i])) for i in range(72)])
+        plt.plot([np.average(np.abs(error[:,i])) for i in range(error.shape[1])])
         if self.show_plot:
             plt.show()
 
@@ -55,11 +55,17 @@ class ProfileEvaluator(Evaluator):
 
         mlflow.log_figure(pred_vs_true_fig, name_prefix + "_pred_vs_true_(index " + str(index) + ").png")
 
-    def generate_netcdf(self, pred: ndarray, truth: ndarray, latlon: ndarray, name_prefix: str):
-        # TODO: Implement this!
-        # TODO: Surface pressure
+    def generate_netcdf(self,
+                        pred: ndarray,
+                        truth: ndarray,
+                        latlon: ndarray,
+                        surface_pressure: ndarray,
+                        name_prefix: str):
+
         fname = f"{name_prefix}_{self.config_name}_{self.current_run}.nc"
         fn = f"{self.nc_path}/{fname}"
+
+        mlflow.log_param(f"Path to {name_prefix} NetCDF", fn)
 
         with netCDF4.Dataset(fn, 'w', format='NETCDF4') as nc:
 
@@ -67,22 +73,23 @@ class ProfileEvaluator(Evaluator):
 
             nc.title = "Truth vs Predicted Profiles"
             nc.run_config = self.config_name
-            nc.surface_pressure = 1000.0
 
             rows_dim = nc.createDimension('row', num_rows)
             # rows_dim.units = "Index"
             # rows_dim.long_name = "Sample Index in the data set"
 
-            z_dim = nc.createDimension('z', 72)
+            z_dim = nc.createDimension('z', pred.shape[1])
             # z_dim.units = "Sigma"
             # z_dim.long_name = "Pressure level in Sigma"
 
             z_true = nc.createVariable('profile_true', np.float64, ('row', 'z'))
             z_pred = nc.createVariable('profile_pred', np.float64, ('row', 'z'))
+            spr = nc.createVariable('surface_pressure', np.float64, ('row'))
             lat = nc.createVariable('lat', np.float64, ('row'))
             lon = nc.createVariable('lon', np.float64, ('row'))
 
             lat[:] = latlon[:, 0]
             lon[:] = latlon[:, 1]
+            spr[:] = surface_pressure[:]
             z_true[:, :] = truth
             z_pred[:, :] = pred

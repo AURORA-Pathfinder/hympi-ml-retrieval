@@ -22,8 +22,14 @@ class ModelIO(BaseModel):
     def get_transformed_features(self) -> np.ndarray:
         x = [feature.transformed_data for feature in self.features]
 
+        #print("length features", len(self.features))
+        #for i in x:
+        #    print(i.shape)
+
         if len(x) == 1:
             x = x[0]
+
+        # TODO Need to figure out how to tell which one is pressure
 
         return x
 
@@ -41,9 +47,14 @@ class ModelIO(BaseModel):
     def predict_model(self, model: Model, batch_size: int = 10000) -> (np.ndarray, np.ndarray):
         x = self.get_transformed_features()
 
+        for n, i in enumerate(x):
+            # TODO any other scalar inputs will confuse this
+            if i.shape[-1] == 1:
+                surface_pressure = self.features[n]
+
         pred = model.predict(x, batch_size=batch_size, verbose=False)
-        pred = self.target.transformer.inverse_transform(pred) # transforms predicted target based on target transformer
+        pred = self.target.transformer.inverse_transform(pred)  # transforms predicted target based on target transformer
 
-        truth = self.target.data # note this is the original data (not transformed)
+        truth = self.target.data  # note this is the original data (not transformed)
 
-        return (pred, truth)
+        return (pred, truth, surface_pressure)

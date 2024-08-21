@@ -83,6 +83,7 @@ class DataLoader():
             case DataName.Pressure: return self.full_data['labels_table'][:,:,0]
             case DataName.Height: return self.full_data['labels_table'][:,:,1]
             case DataName.Temperature: return self.full_data['labels_table'][:,:,2]
+            #case DataName.Water_Vapor: return self.full_data['labels_table'][:,36:,3]
             case DataName.Water_Vapor: return self.full_data['labels_table'][:,:,3]
             case DataName.Ozone_Density: return self.full_data['labels_table'][:,:,4]
             case _: print("No match for " + str(dataName) +" found in file: " + self.file_path)

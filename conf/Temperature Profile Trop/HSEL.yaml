@@ -6,7 +6,7 @@ verbose: True
 config:
   _target_: conf.config.Config
 
-  mlflow_experiment_name: Extensive New Loss Test
+  mlflow_experiment_name: Extensive New Loss Test Tropics
   dataset_name: HSEL
 
   modelIOs:
@@ -88,8 +88,8 @@ splitter:
   _target_: preprocessing.splitters.FileSplitter
   data_loader:
     _target_: preprocessing.DataLoader.DataLoader
-    file_path: /data/nature_run/work/data/bt_bslcpl532_all_72sigma_v2.npz
+    file_path: /data/nature_run/work/data/bt_bslcpl532_all_72sigma_trop.npz
     dry_run: ${dry_run}
-  indices_path: /data/nature_run/work/train_test_split.pkl
+  indices_path: /data/nature_run/work/train_test_split_trop.pkl
 
 #dry_run: True
