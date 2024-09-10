@@ -5,3 +5,6 @@ outputs/
 *.npy
 *.npz
 *.h5
+*.keras
+.venv
+.vscode
