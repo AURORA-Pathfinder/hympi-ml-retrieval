@@ -1,50 +1,64 @@
-from __future__ import annotations
+# from __future__ import annotations
+from dataclasses import dataclass
 from typing import List
 
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, Dense, Dropout, Concatenate, Flatten
+from keras.models import Model
+import keras.layers
+from keras.layers import Dense, Dropout, Concatenate, Flatten
 
-# data for a multi-layer perceptron
-# note: dropout_rate is has a default value that is low enough that it is the same as not having a dropout at all
+@dataclass
 class MLPData:
-    def __init__(self, layer_sizes: List[int], activation: str, output_activation: str = None, dropout_rate: float = 0.000001) -> None:
-        self.layer_sizes = layer_sizes
-        self.activation = activation
-        self.output_activation = output_activation
-        self.dropout_rate = dropout_rate
+    '''
+    Data that can build a Multi-Layer Perceptron (MLP) model
+    '''
+    input_layer: keras.layers.Layer
+    dense_sizes: List[int]
+    activation: str
+    dropout_rate: int | None
+    output_activation: str | None
 
-# builds the layers for an MLP in the functional model and returns a tuple in form of (input layer, final layer)
-# If an output_activation is defined in the data, the output layer will not have dropout and will use that activation
-# otherwise, all layers will use the activation with the dropout_rate
+
 def build_mlp_layers(mlp_data: MLPData):
+    '''
+    Builds the layers of a Multi-Layer Perceptron (MLP) model and returns a tuple in the form of (input layer, output layer).
+    '''
+
+    sizes = mlp_data.dense_sizes
+
     is_output = mlp_data.output_activation != None
 
-    input_layer = Input(shape=(mlp_data.layer_sizes[0],))
-    final_layer = input_layer
-
     if is_output:
-        sizes = mlp_data.layer_sizes[1:-1]
-    else:
-        sizes = mlp_data.layer_sizes[1:]
+        sizes = mlp_data.dense_sizes[0:-1]
+
+    final_layer = mlp_data.input_layer
 
     for size in sizes:
-        final_layer = Dropout(mlp_data.dropout_rate)(Dense(size, mlp_data.activation, kernel_regularizer='l1')(final_layer))
+        final_layer = Dense(size, mlp_data.activation, kernel_regularizer='l1')(final_layer)
+
+        if mlp_data.dropout_rate is not None:
+            final_layer = Dropout(mlp_data.dropout_rate)(final_layer)
 
     if is_output:
-        output_size = mlp_data.layer_sizes[-1]
+        output_size = mlp_data.dense_sizes[-1]
         final_layer = Dense(output_size, mlp_data.output_activation)(final_layer)
 
-    return (input_layer, final_layer)
+    return (mlp_data.input_layer, final_layer)
 
 
-# builds a model from MLPData
 def build_mlp_model(mlp_data: MLPData):
+    '''
+    Builds a single-path Multi-Layer Perceptron (MLP) model from MLP data
+    '''
     (input_layer, output) = build_mlp_layers(mlp_data)
     return Model(input_layer, output)
 
 
-# Constructs an mlp consisting of multiple paths with a final MLP for the output
 def build_multipath_mlp_model(path_mlp_datas: List[MLPData], output_mlp_data: MLPData):
+    '''
+    Constructs a Multi-Layer Perception (MLP) model consisting of multiple paths with a final
+    MLP for the output.
+    '''
+
     paths_layers = [build_mlp_layers(path_data) for path_data in path_mlp_datas]
 
     input_layers = [path_layers[0] for path_layers in paths_layers]
@@ -53,10 +67,13 @@ def build_multipath_mlp_model(path_mlp_datas: List[MLPData], output_mlp_data: ML
     output = Concatenate(axis=1)(path_final_layers)
     output = Flatten()(output)
 
-    for size in output_mlp_data.layer_sizes[0:-1]:
-        output = Dropout(output_mlp_data.dropout_rate)(Dense(size, output_mlp_data.activation, kernel_regularizer='l1')(output))
+    for size in output_mlp_data.dense_sizes[0:-1]:
+        output = Dense(size, output_mlp_data.activation, kernel_regularizer='l1')(output)
 
-    output_size = output_mlp_data.layer_sizes[-1]
+        if output_mlp_data.dropout_rate is not None:
+            output = Dropout(output_mlp_data.dropout_rate)(output)
+
+    output_size = output_mlp_data.dense_sizes[-1]
     output = Dense(output_size, output_mlp_data.output_activation)(output)
 
     return Model(input_layers, output)
