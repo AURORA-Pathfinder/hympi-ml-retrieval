@@ -1,48 +1,7 @@
-import os
-
 import numpy as np
-import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
 import netCDF4
-
-
-def log_mae_per_level(name: str, error: np.ndarray, show_plot: bool):
-    error_fig = plt.figure()
-    levels = error.shape[1]
-
-    plt.plot([np.average(np.abs(error[:,i])) for i in range(levels)])
-
-    if show_plot:
-        plt.show()
-
-    mlflow.log_figure(error_fig, f"{name}_mae_per_level.png")
-
-
-def log_pred_vs_true(name: str,
-                     pred: np.ndarray,
-                     truth: np.ndarray,
-                     index: int,
-                     show_plot: bool):
-    
-    base_dir = "temp/"
-    if not os.path.exists(base_dir):
-        os.makedirs(base_dir)
-
-    npy_file_path = f"{base_dir + name}_pred_(index: {index}).npy"
-    np.save(npy_file_path, pred[index])
-    mlflow.log_artifact(npy_file_path)
-
-    pred_vs_true_fig = plt.figure()
-    plt.plot(truth[index], label="true")
-    plt.plot(pred[index], label="pred")
-    plt.legend(loc="lower right")
-    
-    if show_plot:
-        plt.show()
-
-    mlflow.log_figure(pred_vs_true_fig, f"{name}_pred_vs_true_(index: {index}).png")
-
 
 def generate_netcdf(name: str,
                     config_name: str,
