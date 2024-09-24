@@ -1,10 +1,9 @@
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 import math
 import collections.abc
 
 import numpy as np
-import keras
-import keras.utils;
+import keras.utils
 
 class MemmapSequence(collections.abc.Sequence):
     '''
@@ -34,9 +33,9 @@ class MemmapSequence(collections.abc.Sequence):
         '''
         return sum(map(lambda m: m.shape[0], self.memmaps))
 
-    def __getitem__(self, val: int | slice) -> np.memmap | np.ndarray:
+    def __getitem__(self, val: int | slice | np.ndarray) -> np.memmap | np.ndarray:
         '''
-        Returns the value at a specific index or slice from the list of memmaps as if it were
+        Returns the value at a specific index or slice (or set of indices) from the list of memmaps as if it were
         one concatenated list. 
         
         Note that, if the value is an index or slice within a single file, then 
@@ -44,7 +43,7 @@ class MemmapSequence(collections.abc.Sequence):
         will be returned due to limitations when concatenating numpy memmaps.
         '''
 
-        if isinstance(val, int):
+        if isinstance(val, (int, np.int_)):
             index = val
             file_index = 0
 
@@ -72,7 +71,9 @@ class MemmapSequence(collections.abc.Sequence):
                     clamp_stop = min(size, stop)
                     clamp_start = max(start, 0)
 
-                    slices.append(memmap[clamp_start:clamp_stop:val.step])
+                    data = memmap[clamp_start:clamp_stop:val.step]
+
+                    slices.append(data)
 
                 start -= size
                 stop -= size
@@ -82,27 +83,31 @@ class MemmapSequence(collections.abc.Sequence):
             else:
                 return np.concatenate(slices)
             
+        if isinstance(val, np.ndarray):
+            samples = []
+            for index in val:
+                samples.append(self[index])
 
-    def get_shape(self) -> Tuple | List[Tuple]:
+            return np.array(samples)
+    
+    @property
+    def data_shape(self) -> Tuple:
         '''
-        Returns the shape of the set of memmaps in the form of a tuple (similar to numpy).
+        Returns the shape of the first index of the dataset
         '''
-        shape = self.memmaps[0].shape
-        return (self.__len__(),) + shape[1:]
+        shape = self.memmaps[0][0].shape
 
-    def compare_internal_shapes(self, other) -> bool:
-        '''
-        Returns True if the shape of the other Memmaps is equivalent to the shape of this one.
-        '''
+        if shape == ():
+            return (1,)
+        
+        return shape
 
-        if len(self.memmaps) != len(other.memmaps):
-            return False
-
-        for i in range(len(self.memmaps)):
-            if self.memmaps[i].shape[1:] != other.memmaps[i].shape[1:]:
-                return False
-            
-        return True
+    @property
+    def shape(self) -> Tuple:
+        '''
+        Returns the shape of the combined set of the memmaps
+        '''
+        return (self.__len__(),) + self.data_shape
 
 
 class MemmapBatches(keras.utils.Sequence):
@@ -111,7 +116,13 @@ class MemmapBatches(keras.utils.Sequence):
 
     Meant to be used as both the features and targets for training models with Keras.
     '''
-    def __init__(self, features: List[MemmapSequence], target: MemmapSequence, batch_size: int, shuffle: bool = True, shuffle_seed: int | None = None):
+    def __init__(self, 
+                 features: List[MemmapSequence], 
+                 target: MemmapSequence, 
+                 batch_size: int, 
+                 shuffle: bool = True,
+                 shuffle_seed: Optional[int] = None):
+        
         self.features = features
         self.target = target
 
