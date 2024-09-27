@@ -4,6 +4,7 @@ import keras.layers
 
 import tensorflow as tf
 
+
 class GaussianPerBandLayer(keras.layers.Layer):
     def __init__(self, stds):
         super().__init__()
@@ -14,7 +15,9 @@ class GaussianPerBandLayer(keras.layers.Layer):
         Takes an input tensor consisting of scaled radiances.
         Returns the radiances with a randomly generated noise applied to it.
         """
-        noise = np.array([np.random.normal(scale=x) for x in self.stds], dtype="float32")
+        noise = np.array(
+            [np.random.normal(scale=x) for x in self.stds], dtype="float32"
+        )
         self.band_std = tf.Variable(initial_value=noise, trainable=False)
         return tf.add(inputs, self.band_std)
 
@@ -30,7 +33,6 @@ class GaussianPerBandLayer(keras.layers.Layer):
 #         band_noise = np.append(band_noise, 0)
 #         nd[key] = band_noise
 #         nd[band_noise.shape[0]] = band_noise
-        
+
 #     for key, j in zip(bands, inputs_tmp):
 #         inputs.append(GaussianPerBandLayer(nd[key])(j))
-

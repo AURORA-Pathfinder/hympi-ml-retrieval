@@ -1,5 +1,5 @@
 import numpy as np
-from tensorflow.keras import backend as K
+from keras import backend as K
 
 
 def weighted_mae(y_true, y_pred):

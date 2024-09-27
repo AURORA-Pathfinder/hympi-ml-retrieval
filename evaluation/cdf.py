@@ -1,0 +1,80 @@
+import mlflow
+import numpy as np
+from h5netcdf.legacyapi import Dataset
+from keras.models import Model
+
+from data.fulldays.loading import DKey, FullDaysLoader
+from data.fulldays.dataset import FullDaysDataset, get_datasets_from_run
+from utils.gpu import set_gpus
+
+set_gpus(count=1)
+
+
+def generate_netcdf(
+    day: str,
+    model: Model,
+    train: FullDaysDataset,
+    test: FullDaysDataset,
+    validation: FullDaysDataset,
+    cloud_fraction: float,
+    name_prefix: str,
+):
+    """
+    Creates NETCDF files representing predictions from train and test datasets on a model.
+    """
+    train_days = train.days
+    test_days = test.days
+    validation_days = validation.days
+
+    day_context = "test"
+
+    if day in train_days:
+        day_context = "train"
+    elif day in validation_days:
+        day_context = "val"
+
+    day_dataset = train
+    day_dataset.set_days([day])
+
+    instrument = list(day_dataset.features.keys())[0]
+    target_name = day_dataset.target_name
+
+    nc_path = "/data/nature_run/nc"
+    file_path = (
+        f"{nc_path}/{name_prefix}_{day_context}_{target_name}_{day}_{instrument}.nc"
+    )
+
+    with Dataset(file_path, "w") as nc:
+        nc.title = "Truth vs. Predicted Profiles"
+        nc.run_config = name_prefix
+
+        nc.training_days = ",".join(train_days)
+        nc.validation_days = ", ".join(validation_days)
+        nc.test_days = ",".join(test_days)
+
+        nc.cf = str(cloud_fraction)  # TODO: Include CF in fulldays?
+
+        nc.model_type = f"{instrument} {target_name}"
+
+        num_rows = day_dataset.count
+        rows_dim = nc.createDimension("row", num_rows)
+
+        z_dim = nc.createDimension("z", day_dataset.target_shape[0])
+
+        z_true = nc.createVariable("profile_true", np.float64, ("row", "z"))
+        z_pred = nc.createVariable("profile_pred", np.float64, ("row", "z"))
+        spr = nc.createVariable("surface_pressure", np.float64, ("row",))
+        lat = nc.createVariable("lat", np.float64, ("row",))
+        lon = nc.createVariable("lon", np.float64, ("row",))
+
+        (data_lat, data_lon) = day_dataset.get_latlon()
+        data_spress = day_dataset.loader.get_data(DKey.SURFACE_PRESSURE)
+
+        lat[:] = data_lat[:]
+        lon[:] = data_lon[:]
+        spr[:] = data_spress[:]
+
+        z_true[:, :] = day_dataset.target[:]
+
+        pred = day_dataset.predict(model)
+        z_pred[:, :] = pred
