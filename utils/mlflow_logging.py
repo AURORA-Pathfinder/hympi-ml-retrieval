@@ -7,10 +7,7 @@ from mlflow.tracking._tracking_service.client import TrackingServiceClient
 import keras.models
 
 
-# starts a new mlflow run with a given experiment name and returns the run_id
-def start_run(
-    tracking_uri: str, experiment_name: str, **autolog_args
-) -> mlflow.ActiveRun:
+def start_run(tracking_uri: str, experiment_name, **autolog_args) -> mlflow.ActiveRun:
     """
     Starts a new mlflow run with a given experiment name and returns the ActiveRun.
     """
@@ -54,8 +51,6 @@ def get_datasets_by_context(run_id: str) -> Dict[str, mlflow.data.Dataset]:
     run = mlflow.get_run(run_id)
 
     dataset_dict = {}
-
-    run.inputs.dataset_inputs
 
     for dataset_input in run.inputs.dataset_inputs:
         context = "unknown"

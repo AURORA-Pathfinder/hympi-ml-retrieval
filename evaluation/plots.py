@@ -63,13 +63,9 @@ def plot_pred_error(
     return fig
 
 
-def plot_mae_per_level(
-    pred: np.ndarray, truth: np.ndarray, context: str, show: bool
-) -> Figure:
-    """
-    Returns a figure plotting the MAE for each level in a profile.
-    This is useful for understanding which levels may be resulting in the most error.
-    """
+def plot_mae_per_level(pred: np.ndarray, truth: np.ndarray, context: str, show: bool) -> Figure:
+    """Generates a plot showing mean absolute error (MAE) for each sigma level."""
+
     mae_per_level = metrics.mae_per_level(pred, truth)
 
     fig = plt.figure()
@@ -85,8 +81,8 @@ def plot_mae_per_level(
 
 def plot_variance_per_level(pred: np.ndarray, show: bool) -> Figure:
     """
-    Calculates the variance on a set of predictions for a model. Useful for seeing if the model
-    is simply reducing to the mean.
+    Calculates the variance on a set of predictions for a model.
+    Useful for seeing if the model is simply reducing to the mean.
     """
     var_per_level = metrics.var_per_level(pred)
 

@@ -59,9 +59,7 @@ decoder = Dense(hsel_train.data_shape[0], act.linear)(encoder)
 autoencoder = Model(input_layer, decoder)
 encoder = Model(input_layer, encoder)
 
-autoencoder.compile(
-    optimizer=opt.Adam(), loss=losses.Huber(), metrics=[metrics.MAE, metrics.MSE]
-)
+autoencoder.compile(optimizer=opt.Adam(), loss=losses.Huber(), metrics=[metrics.MAE, metrics.MSE])
 autoencoder.summary()
 
 # %% Training
