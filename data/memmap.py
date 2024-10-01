@@ -10,7 +10,8 @@ class MemmapSequence(collections.abc.Sequence):
     """
     A wrapper class for a list of memmaps that represent a single, combined dataset.
 
-    Once initialized, allows for quickly indexing and slicing into the set of memmaps as if it were one concatenated array.
+    Once initialized, allows for quickly indexing and slicing into the set of memmaps
+    as if it were one concatenated array.
     """
 
     def __init__(self, memmaps: List[np.memmap]):
@@ -18,7 +19,7 @@ class MemmapSequence(collections.abc.Sequence):
         for m in memmaps:
             if m.shape[1:] != ref_shape:
                 raise Exception(
-                    f"Not all memmaps have the same shape! Should be {ref_shape}, but got {m.shape[1:]} from {m.filename}."
+                    f"A memmap has the wrong shape! Expected {ref_shape}, but received {m.shape[1:]} from {m.filename}."
                 )
 
         self.memmaps = memmaps
@@ -35,7 +36,7 @@ class MemmapSequence(collections.abc.Sequence):
         """
         Returns the total size by taking the sum of the first shape value in each memmaps.
         """
-        return sum(map(lambda m: m.shape[0], self.memmaps))
+        return sum((m.shape[0] for m in self.memmaps))
 
     def __getitem__(self, val: int | slice | np.ndarray) -> np.memmap | np.ndarray:
         """

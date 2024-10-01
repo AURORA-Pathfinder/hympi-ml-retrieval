@@ -7,9 +7,7 @@ import numpy as np
 from data.memmap import MemmapBatches
 
 
-def log_eval_metrics(
-    model: Model, batches: MemmapBatches, context: str
-) -> Dict[str, Any]:
+def log_eval_metrics(model: Model, batches: MemmapBatches, context: str) -> Dict[str, Any]:
     """
     Runs `keras.model.evaluate` on the given model with the given MemmapBatches. Logs the output set of metrics
     on MLFlow prefixed with the given context string.

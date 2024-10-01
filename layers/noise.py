@@ -15,9 +15,7 @@ class GaussianPerBandLayer(keras.layers.Layer):
         Takes an input tensor consisting of scaled radiances.
         Returns the radiances with a randomly generated noise applied to it.
         """
-        noise = np.array(
-            [np.random.normal(scale=x) for x in self.stds], dtype="float32"
-        )
+        noise = np.array([np.random.normal(scale=x) for x in self.stds], dtype="float32")
         self.band_std = tf.Variable(initial_value=noise, trainable=False)
         return tf.add(inputs, self.band_std)
 

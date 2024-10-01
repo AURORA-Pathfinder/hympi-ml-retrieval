@@ -24,6 +24,8 @@ class DKey(str, Enum):
 
     ATMS = auto()
 
+    CPL = auto()
+
     LABELS_SCALAR = auto()
     LATITUDE = auto()
     LONGITUDE = auto()
@@ -51,7 +53,7 @@ class FullDaysLoader:
         """
         Returns the directory where the fulldays data is being pulled from.
         """
-        return "/data/nature_run/fulldays_reduced_evenmore"
+        return "/data/nature_run/fulldays_reduced"
 
     def get_data(self, key: DKey | str) -> MemmapSequence:
         """
@@ -64,19 +66,19 @@ class FullDaysLoader:
         memmaps = [self.find_memmap(day, key) for day in self.days]
         return MemmapSequence(memmaps)
 
-    def find_memmap(self, day: str, dataName: DKey) -> np.memmap:
+    def find_memmap(self, day: str, key: DKey) -> np.memmap:
         """
         Matches a given DataName to a specific memmap in a file on disk.
         """
         dir_path = f"{self.data_dir}/{day}/"
 
         hsel = np.load(dir_path + "hsel.npy", mmap_mode="r")
-        hw = np.load(dir_path + "hw.npy", mmap_mode="r")
         atms = np.load(dir_path + "mh.npy", mmap_mode="r")
+        cpl = np.load(dir_path + "cpl.npy", mmap_mode="r")
         scalar = np.load(dir_path + "scalar.npy", mmap_mode="r")
         table = np.load(dir_path + "table.npy", mmap_mode="r")
 
-        match dataName:
+        match key:
             case DKey.HSEL:
                 return hsel
             case DKey.HA:
@@ -87,13 +89,16 @@ class FullDaysLoader:
                 return hsel[:, 932:1433]
             case DKey.HD:
                 return hsel[:, 1433:1934]
+            case DKey.HW:
+                return hsel[:, 1433:1957]
             case DKey.HMW:
                 return hsel[:, -1]
-            case DKey.HW:
-                return hw
 
             case DKey.ATMS:
                 return atms
+
+            case DKey.CPL:
+                return cpl
 
             case DKey.LABELS_SCALAR:
                 return scalar
@@ -120,4 +125,4 @@ class FullDaysLoader:
                 return table[:, :, 2]
 
             case _:
-                raise Exception(f"No match for {str(dataName)} found in {dir_path}")
+                raise Exception(f"No match for {str(key)} found in {dir_path}")

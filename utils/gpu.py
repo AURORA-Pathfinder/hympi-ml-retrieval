@@ -1,18 +1,24 @@
 import subprocess as sb
 import os
 
+
 def set_gpus(count: int = 1, min_free: float = 0.99, verbose: bool = False):
-    '''
-    Sets the environment variable "CUDA_VISIBLE_DEVICES" for tensorflow GPU 
-    training.
+    """
+    Sets the environment variable "CUDA_VISIBLE_DEVICES" for tensorflow GPU training.
 
-    Calculated by finding the GPUs with the most available memory. With a given 
-    count value that determines the number of GPUs to use (default is 1).
+    Calculated by finding the GPUs with the most available memory first.
 
-    In order to be set as a gpu, the GPU must have a free / total ratio greater
-    than the 'min-free' parameter (default is 0.99).
-    '''
+    Also sets "TF_GPU_ALLOCATOR" to "cuda_malloc_async" which makes it so that GPU
+    memory is not completely taken over by Tensorflow.
 
+    Args:
+        count (int, optional): The number of GPUs to make visible. Defaults to 1.
+        min_free (float, optional):
+            The minimum free / total memory ratio required for a GPU to be selected.
+            Defaults to 0.99.
+        verbose (bool, optional):
+            Whether to print the list of visible GPUs to the console. Defaults to False.
+    """
     cmd = "nvidia-smi --query-gpu=memory.free,memory.total --format=csv"
     lines = sb.check_output(cmd.split()).decode("ascii").splitlines()[1:]
 
@@ -29,7 +35,7 @@ def set_gpus(count: int = 1, min_free: float = 0.99, verbose: bool = False):
         if mem > min_free:
             free_mems.append((i, mem))
 
-    sorted(free_mems, key=lambda x: x[1])
+    sorted(free_mems, key=lambda x: -x[1])
 
     indices = [free_mem[0] for free_mem in free_mems[:count]]
 
@@ -38,7 +44,7 @@ def set_gpus(count: int = 1, min_free: float = 0.99, verbose: bool = False):
         env_str += f"{index},"
 
     os.environ["CUDA_VISIBLE_DEVICES"] = env_str
-    os.environ["TF_GPU_ALLOCATOR"]="cuda_malloc_async"
+    os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
 
-    if (verbose):
+    if verbose:
         print(f"Set environment variable, CUDA_VISIBLE_DEVICES, to {env_str}.")

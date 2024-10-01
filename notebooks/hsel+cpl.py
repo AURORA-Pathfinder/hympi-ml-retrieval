@@ -5,8 +5,6 @@ sys.path.insert(0, "..")
 
 import mlflow
 import mlflow.keras
-import numpy as np
-import matplotlib.pyplot as plt
 
 import keras.callbacks as callbacks
 import keras.activations as act
@@ -15,8 +13,6 @@ import keras.losses as losses
 import keras.metrics as metrics
 from keras.layers import (
     Dense,
-    Dropout,
-    BatchNormalization,
     Concatenate,
     LayerNormalization,
 )
@@ -31,11 +27,9 @@ import evaluation.plots as plots
 
 from utils.gpu import set_gpus
 
-set_gpus(min_free=0.75)
+set_gpus(min_free=0.9)
 
-
-# %% Data Loading
-instr = DKey.HSEL
+#  Data Loading
 target_name = DKey.TEMPERATURE
 
 mlflow_logging.start_run(
@@ -45,7 +39,7 @@ mlflow_logging.start_run(
 )
 
 (train, validation, test) = fd.get_split_datasets(
-    feature_names=[instr, DKey.SURFACE_PRESSURE],
+    feature_names=[DKey.HSEL, DKey.CPL, DKey.SURFACE_PRESSURE],
     target_name=target_name,
     train_days=[
         "20060315",
@@ -62,36 +56,39 @@ mlflow_logging.start_run(
     logging=True,
 )
 
-# %% Model Creation
+# Model Creation
 input_layers = train.get_input_layers()
 
-instr_input = input_layers[instr]
-instr_output = instr_input
+hsel_input = input_layers[DKey.HSEL]
+hsel_output = hsel_input
 
 # encoder = mlflow_logging.get_model("6d1374316f334f65a6d529d2ddcaf4f8", "encoder.keras")
 # encoder.trainable = False
-# instr_output = encoder(instr_output)
-instr_output = LayerNormalization()(instr_output)
+# hsel_output = encoder(hsel_output)
+hsel_output = LayerNormalization()(hsel_output)
+
+cpl_input = input_layers[DKey.CPL]
+cpl_output = LayerNormalization()(cpl_input)
 
 spress_input = input_layers[DKey.SURFACE_PRESSURE]
 spress_output = LayerNormalization()(spress_input)
 
 activation = act.swish
-size = 128
-output = Concatenate()([instr_output, spress_output])
-output = Dense(size, activation)(output)
-output = Dense(size, activation)(output)
-output = Dense(size, activation)(output)
+output = Concatenate()([hsel_output, cpl_output, spress_output])
+output = Dense(1024, activation)(output)
+output = Dense(512, activation)(output)
+output = Dense(256, activation)(output)
+output = Dense(128, activation)(output)
 output = Dense(72)(output)
-model = Model([instr_input, spress_input], output)
+model = Model([hsel_input, cpl_input, spress_input], output)
 
 model.compile(optimizer=opt.Adam(), loss=losses.MAE, metrics=[metrics.MAE, metrics.MSE])
 
 model.summary()
 
-# %% Training
+# Training
 
-batch_size = 2000
+batch_size = 500
 mlflow.log_param("memmap_batch_size", batch_size)
 
 train_batches = train.create_batches(batch_size)
@@ -107,7 +104,7 @@ model.fit(
     callbacks=[early_stopping],
 )
 
-# %% Evaluation
+# Evaluation
 
 log_eval_metrics(model, test_batches, "test")
 
@@ -116,14 +113,10 @@ test_batches.shuffle = False
 test_pred = model.predict(test_batches, steps=steps)
 test_truth = test.target[0 : steps * batch_size]
 
-var = plots.plot_pred_truth_var(
-    test_pred, test_truth, context=f"{steps} Test Batches", show=True
-)
+var = plots.plot_pred_truth_var(test_pred, test_truth, context=f"{steps} Test Batches", show=True)
 mlflow.log_figure(var, var.get_suptitle() + ".png")
 
-mae = plots.plot_mae_per_level(
-    test_pred, test_truth, context=f"{steps} Test Batches", show=True
-)
+mae = plots.plot_mae_per_level(test_pred, test_truth, context=f"{steps} Test Batches", show=True)
 mlflow.log_figure(mae, mae.get_suptitle() + ".png")
 
 train_batches.shuffle = False
@@ -135,23 +128,17 @@ var = plots.plot_pred_truth_var(
 )
 mlflow.log_figure(var, var.get_suptitle() + ".png")
 
-mae = plots.plot_mae_per_level(
-    train_pred, train_truth, context=f"{steps} Train Batches", show=True
-)
+mae = plots.plot_mae_per_level(train_pred, train_truth, context=f"{steps} Train Batches", show=True)
 mlflow.log_figure(mae, mae.get_suptitle() + ".png")
 
 print("TEST DATASET")
 for i in range(3):
-    fig = plots.plot_pred_error(
-        model, data=test, x_label="Sigma", y_label="Temperature (K)"
-    )
+    fig = plots.plot_pred_error(model, data=test, x_label="Sigma", y_label="Temperature (K)")
     mlflow.log_figure(fig, f"test_pred_error_{i}.png")
 
 print("TRAIN DATASET")
 for i in range(3):
-    fig = plots.plot_pred_error(
-        model, data=train, x_label="Sigma", y_label="Temperature (K)"
-    )
+    fig = plots.plot_pred_error(model, data=train, x_label="Sigma", y_label="Temperature (K)")
     mlflow.log_figure(fig, f"train_pred_error_{i}.png")
 
 mlflow.end_run()

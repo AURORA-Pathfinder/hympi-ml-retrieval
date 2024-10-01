@@ -1,10 +1,9 @@
-import mlflow
 import numpy as np
 from h5netcdf.legacyapi import Dataset
 from keras.models import Model
 
-from data.fulldays.loading import DKey, FullDaysLoader
-from data.fulldays.dataset import FullDaysDataset, get_datasets_from_run
+from data.fulldays.loading import DKey
+from data.fulldays.dataset import FullDaysDataset
 from utils.gpu import set_gpus
 
 set_gpus(count=1)
@@ -20,7 +19,18 @@ def generate_netcdf(
     name_prefix: str,
 ):
     """
-    Creates NETCDF files representing predictions from train and test datasets on a model.
+    Generates a NetCDF file represnting the prediction for a single day worth of data.
+
+    Note that the files will always generate at the /data/nature_run/nc directory.
+
+    Args:
+        day (str): The day in the string format YYYYMMDD
+        model (Model): The keras model to run predictions
+        train (FullDaysDataset): The training dataset for metadata
+        test (FullDaysDataset): The test dataset for metadata
+        validation (FullDaysDataset): The validation dataset for metadata
+        cloud_fraction (float): The cloud fraciton of the train, test, and validation datasets
+        name_prefix (str): The prefix applied to the output file name
     """
     train_days = train.days
     test_days = test.days
@@ -40,9 +50,7 @@ def generate_netcdf(
     target_name = day_dataset.target_name
 
     nc_path = "/data/nature_run/nc"
-    file_path = (
-        f"{nc_path}/{name_prefix}_{day_context}_{target_name}_{day}_{instrument}.nc"
-    )
+    file_path = f"{nc_path}/{name_prefix}_{day_context}_{target_name}_{day}_{instrument}.nc"
 
     with Dataset(file_path, "w") as nc:
         nc.title = "Truth vs. Predicted Profiles"
@@ -57,9 +65,9 @@ def generate_netcdf(
         nc.model_type = f"{instrument} {target_name}"
 
         num_rows = day_dataset.count
-        rows_dim = nc.createDimension("row", num_rows)
+        nc.createDimension("row", num_rows)
 
-        z_dim = nc.createDimension("z", day_dataset.target_shape[0])
+        nc.createDimension("z", day_dataset.target_shape[0])
 
         z_true = nc.createVariable("profile_true", np.float64, ("row", "z"))
         z_pred = nc.createVariable("profile_pred", np.float64, ("row", "z"))

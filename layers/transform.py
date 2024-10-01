@@ -11,9 +11,7 @@ from keras.layers import Normalization
 from data.memmap import MemmapSequence
 
 
-def create_norm_layer(
-    data: np.ndarray | MemmapSequence, random_samples: Optional[int]
-) -> Normalization:
+def create_norm_layer(data: np.ndarray | MemmapSequence, random_samples: Optional[int]) -> Normalization:
     """
     Creates a keras normalization layer adapted from the given data sequence. Define a number of random
     samples to pull a random subset of the input data.

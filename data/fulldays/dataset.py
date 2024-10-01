@@ -181,11 +181,15 @@ class FullDaysDataset(Dataset):
 
         return config
 
-    def log(self, context: str):
+    def log(self, context: str, run_id: Optional[str] = None):
         """
         Logs this dataset for the current MLFlow run with a provided "context" label
         """
-        mlflow.log_input(self, context)
+        if run_id is not None:
+            with mlflow.start_run(run_id):
+                mlflow.log_input(self, context)
+        else:
+            mlflow.log_input(self, context)
 
     def create_batches(self, batch_size: int) -> MemmapBatches:
         return MemmapBatches(list(self.features.values()), self.target, batch_size)
@@ -240,7 +244,6 @@ def get_split_datasets(
     train_days: List[str],
     validation_days: List[str],
     test_days: List[str],
-    logging: bool,
 ) -> Tuple[FullDaysDataset, FullDaysDataset, FullDaysDataset]:
     """
     Gets data from a set of three FullDaysLoader and returns a tuple in the form of (train, validation, test)
@@ -259,11 +262,6 @@ def get_split_datasets(
     test = FullDaysDataset(
         days=test_days, feature_names=feature_names, target_name=target_name
     )
-
-    if logging:
-        train.log("train")
-        validation.log("validation")
-        test.log("test")
 
     return (train, validation, test)
 
