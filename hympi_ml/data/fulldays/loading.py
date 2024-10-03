@@ -3,7 +3,7 @@ from enum import Enum, auto
 
 import numpy as np
 
-from data.memmap import MemmapSequence
+from hympi_ml.data.memmap import MemmapSequence
 
 
 class DKey(str, Enum):
@@ -11,7 +11,8 @@ class DKey(str, Enum):
     An Enum that contains the list of datasets that could be loaded.
     """
 
-    def _generate_next_value_(name, *_):
+    # ensures values are all equal to the string version of the enum name
+    def _generate_next_value_(name, *_):  # noqa: N805
         return name
 
     HSEL = auto()
@@ -42,14 +43,19 @@ class DKey(str, Enum):
 
 class FullDaysLoader:
     """
-    A utility class for loading Fulldays data initialized with a given number of days in the YYYYMMDD format.
+    A class for loading Fulldays data initialized with a given number of days in the YYYYMMDD format.
     """
 
     def __init__(self, days: List[str]) -> None:
+        """Initialize a FullDaysLoader with a list of days
+
+        Args:
+            days (List[str]): the list of days to read from (format: YYYYMMDD)
+        """
         self.days = days
 
     @property
-    def data_dir(self):
+    def data_dir(self) -> str:
         """
         Returns the directory where the fulldays data is being pulled from.
         """
@@ -57,7 +63,7 @@ class FullDaysLoader:
 
     def get_data(self, key: DKey | str) -> MemmapSequence:
         """
-        Returns a MemmapSequence from a given DataName on the days initialized in this loader.
+        Returns a MemmapSequence from a given DKey on the days initialized in this loader.
         """
         # convert dataName from a string to enum (if applicable)
         if isinstance(key, str):
@@ -67,8 +73,17 @@ class FullDaysLoader:
         return MemmapSequence(memmaps)
 
     def find_memmap(self, day: str, key: DKey) -> np.memmap:
-        """
-        Matches a given DataName to a specific memmap in a file on disk.
+        """Matches a given DataName to a specific memmap in a file on disk.
+
+        Args:
+            day (str): The day of data to pull from (format: YYYYMMDD)
+            key (DKey): The DKey of the dataset to load
+
+        Raises:
+            Exception: If the day or key provided does not match any existing stored data.
+
+        Returns:
+            np.memmap: _description_
         """
         dir_path = f"{self.data_dir}/{day}/"
 

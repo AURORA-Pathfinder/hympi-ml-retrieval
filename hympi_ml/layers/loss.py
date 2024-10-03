@@ -1,5 +1,5 @@
 import numpy as np
-from keras import backend as K
+from keras import backend as k
 
 
 def weighted_mae(y_true, y_pred):
@@ -87,12 +87,12 @@ def weighted_mae(y_true, y_pred):
     # weights /= np.sum(weights)
 
     # Calculate absolute difference between true and predicted values
-    absolute_difference = K.abs(y_true - y_pred)
+    absolute_difference = k.abs(y_true - y_pred)
 
     # Apply weights to absolute differences
     weighted_absolute_difference = absolute_difference * weights
 
     # Compute the mean of the weighted absolute differences
-    loss = K.sum(weighted_absolute_difference) / np.sum(weights)
+    loss = k.sum(weighted_absolute_difference) / np.sum(weights)
 
     return loss
