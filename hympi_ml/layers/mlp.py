@@ -1,10 +1,10 @@
-from typing import Any, List
+from typing import Any, List, Tuple
 
 from keras.layers import Layer, Dense, Dropout
 
 
 def get_dense_layers(
-    input_layer: Any | list,
+    input_layer: Any,
     sizes: List[int],
     activation: str | Any,
     dropout_rate: float,
@@ -41,3 +41,37 @@ def get_dense_layers(
         final_layer = (layer)(final_layer)
 
     return final_layer
+
+
+def get_autoencoder_layers(
+    input_layer: Any,
+    input_size: int,
+    encode_sizes: List[int],
+    latent_size: int,
+    activation: str | Any,
+    dropout_rate: float,
+    **dense_args,
+) -> Tuple[Layer, Layer]:
+    """
+    Generates a chain of layers representing an Autoencoder with a given latent size.
+
+
+    Args:
+        input_layer (Any): _description_
+        encode_sizes (List[int]): _description_
+        latent_size (int): _description_
+        activation (str | Any): _description_
+        dropout_rate (float): _description_
+
+    Returns:
+        Tuple[Layer, Layer]: A tuple with the autoencoder and encoder layers respectively.
+            Specifically in the form of (autoencoder, encoder).
+    """
+
+    encoder = get_dense_layers(input_layer, encode_sizes, activation, dropout_rate, **dense_args)
+    encoder = (Dense(latent_size, activation=activation, **dense_args))(encoder)
+    encode_sizes.reverse()
+    autoencoder = get_dense_layers(encoder, encode_sizes, activation, dropout_rate, **dense_args)
+    autoencoder = (Dense(input_size))(autoencoder)
+
+    return (autoencoder, encoder)

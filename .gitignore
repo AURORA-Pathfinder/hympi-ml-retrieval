@@ -8,3 +8,5 @@ outputs/
 *.keras
 .venv
 .vscode
+.ruff_cache
+.trash

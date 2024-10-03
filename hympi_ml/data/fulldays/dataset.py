@@ -2,8 +2,8 @@ from typing import List, Optional, Tuple, Dict, Any
 import json
 import hashlib
 
-import mlflow.entities
 import numpy as np
+
 import mlflow
 from mlflow.data.dataset import Dataset, DatasetSource
 from mlflow.data.code_dataset_source import CodeDatasetSource
@@ -14,9 +14,9 @@ from mlflow.types import TensorSpec
 from keras.layers import Input
 from keras.models import Model
 
-from data.memmap import MemmapBatches, MemmapSequence
-from data.fulldays.loading import DKey, FullDaysLoader
-from utils import mlflow_logging
+from hympi_ml.data.memmap import MemmapBatches, MemmapSequence
+from hympi_ml.data.fulldays.loading import DKey, FullDaysLoader
+from hympi_ml.utils import mlflow_log
 
 
 class FullDaysDataset(Dataset):
@@ -122,15 +122,10 @@ class FullDaysDataset(Dataset):
     @property
     def schema(self) -> TensorDatasetSchema:
         features_schema = Schema(
-            [
-                TensorSpec(seq[0].dtype, seq.data_shape, name)
-                for (name, seq) in self.features.items()
-            ]
+            [TensorSpec(seq[0].dtype, seq.data_shape, name) for (name, seq) in self.features.items()]
         )
 
-        target_schema = Schema(
-            [TensorSpec(self.target[0].dtype, self.target.data_shape, self.target_name)]
-        )
+        target_schema = Schema([TensorSpec(self.target[0].dtype, self.target.data_shape, self.target_name)])
 
         return TensorDatasetSchema(features=features_schema, targets=target_schema)
 
@@ -143,12 +138,10 @@ class FullDaysDataset(Dataset):
 
     def _create_name(self) -> str:
         """
-        Generates a name for this dataset based on features and target if none
+        Generates a name for this dataset based on features if none
         is provided during initialization.
         """
         feature_names = "+".join(list(self.features.keys()))
-        target_name = f"={self.target_name}"
-
         return feature_names
 
     def _compute_digest(self) -> str:
@@ -181,15 +174,11 @@ class FullDaysDataset(Dataset):
 
         return config
 
-    def log(self, context: str, run_id: Optional[str] = None):
+    def log(self, context: str):
         """
         Logs this dataset for the current MLFlow run with a provided "context" label
         """
-        if run_id is not None:
-            with mlflow.start_run(run_id):
-                mlflow.log_input(self, context)
-        else:
-            mlflow.log_input(self, context)
+        mlflow.log_input(self, context)
 
     def create_batches(self, batch_size: int) -> MemmapBatches:
         return MemmapBatches(list(self.features.values()), self.target, batch_size)
@@ -244,6 +233,7 @@ def get_split_datasets(
     train_days: List[str],
     validation_days: List[str],
     test_days: List[str],
+    autolog: bool,
 ) -> Tuple[FullDaysDataset, FullDaysDataset, FullDaysDataset]:
     """
     Gets data from a set of three FullDaysLoader and returns a tuple in the form of (train, validation, test)
@@ -255,13 +245,14 @@ def get_split_datasets(
         target_name=target_name,
     )
 
-    validation = FullDaysDataset(
-        days=validation_days, feature_names=feature_names, target_name=target_name
-    )
+    validation = FullDaysDataset(days=validation_days, feature_names=feature_names, target_name=target_name)
 
-    test = FullDaysDataset(
-        days=test_days, feature_names=feature_names, target_name=target_name
-    )
+    test = FullDaysDataset(days=test_days, feature_names=feature_names, target_name=target_name)
+
+    if autolog:
+        train.log("train")
+        test.log("test")
+        validation.log("validation")
 
     return (train, validation, test)
 
@@ -271,5 +262,5 @@ def get_datasets_from_run(run_id: str) -> Dict[str, FullDaysDataset]:
     Given a mlflow run, parses the datasets and creates a dictionary with a key
     as the context tag of the dataset and the values as the fully parsed FullDaysDataset
     """
-    datasets = mlflow_logging.get_datasets_by_context(run_id)
+    datasets = mlflow_log.get_datasets_by_context(run_id)
     return {k: FullDaysDataset.from_base(v) for k, v in datasets.items()}

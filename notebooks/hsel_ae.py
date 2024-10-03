@@ -1,100 +1,111 @@
-# %% Imports and Initialization
-import sys
-
-sys.path.insert(0, "..")
+import gc
 
 import mlflow
-import mlflow.keras
+import optuna
+import keras
+import keras.backend
+from keras import losses, metrics, callbacks, optimizers
+from keras.layers import LayerNormalization
 
-import keras.callbacks as callbacks
-import keras.activations as act
-import keras.optimizers as opt
-import keras.losses as losses
-import keras.metrics as metrics
-from keras.layers import Dense, Dropout
-from keras.models import Model
+from hympi_ml.utils import mlflow_log
+from hympi_ml.data.fulldays import DKey, get_split_datasets
+from hympi_ml.layers import mlp, transform
+from hympi_ml.evaluation import log_eval_metrics, profile
+from hympi_ml.utils.gpu import set_gpus
 
-import utils.mlflow_logging as mlflow_logging
-from data.fulldays.loading import DKey
-from data.fulldays.dataset import get_split_datasets
-from model_creation.transform import create_norm_layer
-from evaluation.metrics import log_eval_metrics
-import evaluation.plots as plots
 
-from utils.gpu import set_gpus
+def _objective(trial: optuna.Trial):
+    set_gpus(min_free=0.99)
+    keras.backend.clear_session()
+    gc.collect()
 
-set_gpus(min_free=0.75)
+    with mlflow.start_run(nested=True):
+        (train, validation, test) = get_split_datasets(
+            feature_names=[DKey.HSEL],
+            target_name=DKey.HSEL,
+            train_days=[
+                "20060315",
+                "20060515",
+                "20060615",
+                "20060715",
+                "20060915",
+                "20061015",
+                "20061115",
+                "20061215",
+                "20060815",
+            ],
+            validation_days=["20060803"],
+            test_days=["20060803"],
+            autolog=True,
+        )
 
-current_run = mlflow_logging.start_run("HSEL Autoencoder", log_datasets=False)
+        # Model Creation
+        input_layers = train.get_input_layers()
 
-# %% Data Loading
-(train, validation, test) = get_split_datasets(
-    feature_names=[DKey.HSEL],
-    target_name=DKey.HSEL,
-    train_days=[
-        "20060315",
-        "20060515",
-        "20060615",
-        "20060715",
-        "20060915",
-        "20061015",
-        "20061115",
-        "20061215",
-    ],
-    validation_days=["20060815"],
-    test_days=["20060803"],
-    logging=True,
-)
+        hsel_input = input_layers[DKey.HSEL]
+        hsel_output = hsel_input
 
-# %% Model Creation
-hsel_train = train.features[DKey.HSEL]
+        hsel_train = train.features[DKey.HSEL]
+        hsel_output = transform.create_norm_layer(hsel_train, 100000)(hsel_output)
 
-latent_size = 100
-mlflow.log_param("latent_size", latent_size)
+        size = trial.suggest_categorical("size", [128, 256, 512])
+        count = trial.suggest_categorical("count", [2, 4])
 
-input_layer = train.get_input_layers()[DKey.HSEL]
-encoder = create_norm_layer(hsel_train, 25000)(input_layer)
-encoder = Dense(latent_size, act.gelu)(encoder)
-decoder = Dense(hsel_train.data_shape[0], act.linear)(encoder)
-autoencoder = Model(input_layer, decoder)
-encoder = Model(input_layer, encoder)
+        latent_size = trial.suggest_categorical("latent_size", [64, 128, 256])
+        mlflow.log_param("latent_size", latent_size)
 
-autoencoder.compile(optimizer=opt.Adam(), loss=losses.Huber(), metrics=[metrics.MAE, metrics.MSE])
-autoencoder.summary()
+        activation = trial.suggest_categorical("activation", ["gelu", "relu"])
+        mlflow.log_param("activation", activation)
 
-# %% Training
+        dropout_rate = trial.suggest_categorical("d_rate", [0.0, 0.05, 0.1, 0.25])
+        mlflow.log_param("dropout_rate", dropout_rate)
 
-batch_size = 64
-mlflow.log_param("memmap_batch_size", batch_size)
+        (ae_layers, enc_layers) = mlp.get_autoencoder_layers(
+            input_layer=hsel_output,
+            input_size=hsel_train.data_shape[0],
+            encode_sizes=[size] * count,
+            latent_size=latent_size,
+            activation=activation,
+            dropout_rate=dropout_rate,
+        )
 
-train_batches = train.create_batches(batch_size)
-val_batches = validation.create_batches(batch_size)
-test_batches = test.create_batches(batch_size)
+        model = keras.Model(input_layers, ae_layers)
+        encoder = keras.Model(input_layers, enc_layers)
 
-early_stopping = callbacks.EarlyStopping(patience=5, verbose=1)
-autoencoder.fit(
-    train_batches,
-    validation_data=val_batches,
-    epochs=500,
-    verbose=1,
-    callbacks=[early_stopping],
-)
+        model.compile(optimizer=optimizers.Adam(), loss=losses.MAE, metrics=[metrics.MAE, metrics.MSE])
+        model.summary()
 
-enc_path = "encoder.keras"
-encoder.save(f"/tmp/{enc_path}")
-mlflow.log_artifact(f"/tmp/{enc_path}")
+        # Training
+        batch_size = 256
 
-# %% Evaluation
-log_eval_metrics(autoencoder, test_batches, "test")
+        train_batches = train.create_batches(batch_size)
+        val_batches = validation.create_batches(batch_size)
+        test_batches = test.create_batches(batch_size)
 
-print("TEST DATASET")
-for i in range(5):
-    fig = plots.plot_pred_error(autoencoder, data=test, y_label="Radiance (K)")
-    mlflow.log_figure(fig, f"test_pred_error_{i}.png")
+        early_stopping = callbacks.EarlyStopping(patience=10, verbose=1)
+        model.fit(
+            train_batches,
+            validation_data=val_batches,
+            epochs=1000,
+            verbose=1,
+            callbacks=[early_stopping],
+        )
 
-print("TRAIN DATASET")
-for i in range(5):
-    fig = plots.plot_pred_error(autoencoder, data=train, y_label="Radiance (K)")
-    mlflow.log_figure(fig, f"train_pred_error_{i}.png")
+        enc_path = "encoder.keras"
+        encoder.save(f"/tmp/{enc_path}")
+        mlflow.log_artifact(f"/tmp/{enc_path}")
 
-mlflow.end_run()
+        # Evaluation
+        profile.log_eval_profile_plots(model, train, test, count=10000)
+        test_metrics = log_eval_metrics(model, test_batches, "test")
+
+        return test_metrics["loss"]
+
+
+with mlflow_log.start_run(
+    tracking_uri="/data/nature_run/hympi-ml-retrieval/mlruns",
+    experiment_name="HSEL Autoencoder",
+    log_datasets=False,
+):
+    study = optuna.create_study(direction="minimize")
+    study.optimize(_objective, n_trials=5)

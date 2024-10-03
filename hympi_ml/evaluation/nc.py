@@ -2,9 +2,10 @@ import numpy as np
 from h5netcdf.legacyapi import Dataset
 from keras.models import Model
 
-from data.fulldays.loading import DKey
-from data.fulldays.dataset import FullDaysDataset
-from utils.gpu import set_gpus
+import hympi_ml.data.fulldays as fd
+from hympi_ml.data.fulldays.dataset import FullDaysDataset
+from hympi_ml.utils.gpu import set_gpus
+import hympi_ml.utils.mlflow_log as mlflow_log
 
 set_gpus(count=1)
 
@@ -76,7 +77,7 @@ def generate_netcdf(
         lon = nc.createVariable("lon", np.float64, ("row",))
 
         (data_lat, data_lon) = day_dataset.get_latlon()
-        data_spress = day_dataset.loader.get_data(DKey.SURFACE_PRESSURE)
+        data_spress = day_dataset.loader.get_data(fd.DKey.SURFACE_PRESSURE)
 
         lat[:] = data_lat[:]
         lon[:] = data_lon[:]
@@ -86,3 +87,22 @@ def generate_netcdf(
 
         pred = day_dataset.predict(model)
         z_pred[:, :] = pred
+
+
+def generate_netcdf_from_run(run_id: str, day: str, cloud_fraction: float = 0.1):
+    loaded_model = mlflow_log.get_autolog_model(run_id)
+
+    datasets = fd.get_datasets_from_run(run_id)
+    test = datasets["test"]
+    validation = datasets["validation"]
+    train = datasets["train"]
+
+    generate_netcdf(
+        day=day,
+        model=loaded_model,
+        train=train,
+        test=test,
+        validation=validation,
+        cloud_fraction=cloud_fraction,
+        name_prefix=f"{run_id}",
+    )

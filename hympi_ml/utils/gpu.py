@@ -1,3 +1,5 @@
+"""Contains utilities for working with GPU training in tensorflow"""
+
 import subprocess as sb
 import os
 
@@ -18,7 +20,11 @@ def set_gpus(count: int = 1, min_free: float = 0.99, verbose: bool = False):
             Defaults to 0.99.
         verbose (bool, optional):
             Whether to print the list of visible GPUs to the console. Defaults to False.
+
+    Raises:
+        Exception: If no available GPUs are found with the provided parameters.
     """
+
     cmd = "nvidia-smi --query-gpu=memory.free,memory.total --format=csv"
     lines = sb.check_output(cmd.split()).decode("ascii").splitlines()[1:]
 
@@ -42,6 +48,9 @@ def set_gpus(count: int = 1, min_free: float = 0.99, verbose: bool = False):
     env_str = ""
     for index in indices:
         env_str += f"{index},"
+
+    if len(indices) == 0:
+        raise Exception("Error attempting to find GPUs! No GPUs found that matched criteria! Please adjust parameters.")
 
     os.environ["CUDA_VISIBLE_DEVICES"] = env_str
     os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
