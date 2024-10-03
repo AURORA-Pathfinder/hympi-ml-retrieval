@@ -5,3 +5,8 @@ outputs/
 *.npy
 *.npz
 *.h5
+*.keras
+.venv
+.vscode
+.ruff_cache
+.trash
