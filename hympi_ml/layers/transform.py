@@ -11,7 +11,7 @@ from keras.layers import Normalization
 from hympi_ml.data.memmap import MemmapSequence
 
 
-def create_norm_layer(data: np.ndarray | MemmapSequence, random_samples: Optional[int]) -> Normalization:
+def adapt_normalization(data: np.ndarray | MemmapSequence, random_samples: Optional[int]) -> Normalization:
     """
     Creates a keras normalization layer adapted from the given data sequence. Define a number of random
     samples to pull a random subset of the input data.
@@ -27,7 +27,7 @@ def create_norm_layer(data: np.ndarray | MemmapSequence, random_samples: Optiona
     return Normalization(mean=mean, variance=variance)
 
 
-def create_minmax_layer(data: np.ndarray | MemmapSequence, random_samples: Optional[int]) -> Normalization:
+def adapt_minmax(data: np.ndarray | MemmapSequence, random_samples: Optional[int]) -> Normalization:
     """
     Creates a keras normalization layer adapted from the given data sequence. Define a number of random
     samples to pull a random subset of the input data if the data is too large.
@@ -43,4 +43,19 @@ def create_minmax_layer(data: np.ndarray | MemmapSequence, random_samples: Optio
     mins = data.min(axis=0)
     maxs = data.max(axis=0)
 
-    return Normalization(mean=mins, variance=np.square(maxs - mins))
+    return create_minmax(mins, maxs)
+
+
+def create_minmax(min: np.ndarray | float, max: np.ndarray | float) -> Normalization:
+    """
+    Uses a Keras normalization with specially calculated mean and variance that allows the layer
+    to work the same way as a custom minmax layer without resorting to a custom keras layers.
+
+    Args:
+        min (np.ndarray): The minimum value or values to create the layer
+        max (np.ndarray): The maximum value or values to create the layer
+
+    Returns:
+        Normalization: A normalization layer with the correctly calculated mean and variance to simulate a min max scaling layer
+    """
+    return Normalization(mean=min, variance=np.square(max - min))

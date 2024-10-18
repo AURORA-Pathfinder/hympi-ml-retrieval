@@ -117,6 +117,7 @@ class FullDaysDataset(Dataset):
             "feature_shapes": self.feature_shapes,
             "target_name": self.target_name,
             "target_shape": self.target_shape,
+            "data_dir": self.loader.data_dir,
         }
 
     @property
