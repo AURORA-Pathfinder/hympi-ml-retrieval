@@ -41,7 +41,7 @@ def set_gpus(count: int = 1, min_free: float = 0.99, verbose: bool = False):
         if mem > min_free:
             free_mems.append((i, mem))
 
-    sorted(free_mems, key=lambda x: -x[1])
+    free_mems = sorted(free_mems, key=lambda x: -x[1])
 
     indices = [free_mem[0] for free_mem in free_mems[:count]]
 

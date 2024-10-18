@@ -21,7 +21,7 @@ def _objective(trial: optuna.Trial):
 
     with mlflow.start_run(nested=True):
         (train, validation, test) = get_split_datasets(
-            feature_names=[DKey.HSEL, DKey.CPL, DKey.SURFACE_PRESSURE],
+            feature_names=[DKey.ATMS, DKey.CPL, DKey.SURFACE_PRESSURE],
             target_name=target_name,
             train_days=[
                 "20060315",
@@ -42,37 +42,29 @@ def _objective(trial: optuna.Trial):
         # Model Creation
         input_layers = train.get_input_layers()
 
-        hsel_input = input_layers[DKey.HSEL]
-        hsel_output = hsel_input
-
-        # encoder = mlflow_logging.get_model("6d1374316f334f65a6d529d2ddcaf4f8", "encoder.keras")
-        # encoder.trainable = False
-        # hsel_output = encoder(hsel_output)
-        hsel_train = train.features[DKey.HSEL]
-        hsel_output = transform.create_minmax_layer(hsel_train, 100_000)(hsel_output)
-        hsel_output = Dense(1024, "gelu")(hsel_output)
-        hsel_output = Dense(512, "gelu")(hsel_output)
-        hsel_output = Dense(256, "gelu")(hsel_output)
+        atms_input = input_layers[DKey.ATMS]
+        atms_train = train.features[DKey.ATMS]
+        atms_output = transform.adapt_minmax(atms_train, 100_000)(atms_input)
 
         cpl_input = input_layers[DKey.CPL]
         cpl_train = train.features[DKey.CPL]
-        cpl_output = transform.create_minmax_layer(cpl_train, 100_000)(cpl_input)
-        cpl_output = Dense(512, "gelu")(cpl_output)
-        cpl_output = Dense(256, "gelu")(cpl_output)
+        cpl_output = transform.adapt_minmax(cpl_train, 100_000)(cpl_input)
+        cpl_output = Dense(128, "gelu")(cpl_output)
+        cpl_output = Dense(32, "gelu")(cpl_output)
 
         spress_input = input_layers[DKey.SURFACE_PRESSURE]
         spress_train = train.features[DKey.SURFACE_PRESSURE]
-        spress_output = transform.create_minmax_layer(spress_train, 100_000)(spress_input)
+        spress_output = transform.adapt_minmax(spress_train, 100_000)(spress_input)
 
-        output = Concatenate()([hsel_output, cpl_output, spress_output])
+        output = Concatenate()([atms_output, cpl_output, spress_output])
 
-        size = trial.suggest_categorical("size", [128, 256, 512])
+        size = trial.suggest_categorical("size", [128, 256])
         count = trial.suggest_categorical("count", [2, 4, 8])
 
         activation = trial.suggest_categorical("activation", ["gelu", "relu"])
         mlflow.log_param("activation", activation)
 
-        dropout_rate = trial.suggest_categorical("d_rate", [0.0, 0.05, 0.1, 0.25])
+        dropout_rate = trial.suggest_categorical("d_rate", [0.0, 0.05, 0.1, 0.2])
         mlflow.log_param("dropout_rate", dropout_rate)
 
         dense_layers = mlp.get_dense_layers(
