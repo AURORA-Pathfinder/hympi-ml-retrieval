@@ -44,17 +44,17 @@ def _objective(trial: optuna.Trial):
 
         atms_input = input_layers[DKey.ATMS]
         atms_train = train.features[DKey.ATMS]
-        atms_output = transform.create_minmax_layer(atms_train, 100_000)(atms_input)
+        atms_output = transform.adapt_minmax(atms_train, 100_000)(atms_input)
 
         cpl_input = input_layers[DKey.CPL]
         cpl_train = train.features[DKey.CPL]
-        cpl_output = transform.create_minmax_layer(cpl_train, 100_000)(cpl_input)
+        cpl_output = transform.adapt_minmax(cpl_train, 100_000)(cpl_input)
         cpl_output = Dense(128, "gelu")(cpl_output)
         cpl_output = Dense(32, "gelu")(cpl_output)
 
         spress_input = input_layers[DKey.SURFACE_PRESSURE]
         spress_train = train.features[DKey.SURFACE_PRESSURE]
-        spress_output = transform.create_minmax_layer(spress_train, 100_000)(spress_input)
+        spress_output = transform.adapt_minmax(spress_train, 100_000)(spress_input)
 
         output = Concatenate()([atms_output, cpl_output, spress_output])
 

@@ -1,12 +1,14 @@
 import mlflow
 import optuna
+import numpy as np
 import keras
 import keras.backend
 from keras import losses, metrics, callbacks, optimizers
-from keras.layers import Dense, Concatenate, LayerNormalization
+from keras.layers import Dense, Concatenate
 
 from hympi_ml.utils import mlflow_log
 from hympi_ml.data.fulldays import DKey, get_split_datasets
+from hympi_ml.data.fulldays.preprocessing import get_minmax
 from hympi_ml.layers import mlp, transform
 from hympi_ml.evaluation import log_eval_metrics, profile
 from hympi_ml.utils.gpu import set_gpus
@@ -20,8 +22,19 @@ def _objective(trial: optuna.Trial):
     keras.backend.clear_session()
 
     with mlflow.start_run(nested=True):
+        use_cpl = trial.suggest_categorical("use_cpl", [True, False])
+        use_spress = trial.suggest_categorical("use_spress", [True, False])
+
+        features_names = [DKey.HSEL]
+
+        if use_cpl:
+            features_names.append(DKey.CPL)
+
+        if use_spress:
+            features_names.append(DKey.SURFACE_PRESSURE)
+
         (train, validation, test) = get_split_datasets(
-            feature_names=[DKey.HSEL, DKey.CPL, DKey.SURFACE_PRESSURE],
+            feature_names=features_names,
             target_name=target_name,
             train_days=[
                 "20060315",
@@ -41,28 +54,37 @@ def _objective(trial: optuna.Trial):
 
         # Model Creation
         input_layers = train.get_input_layers()
+        output_layers = []
 
+        ## HSEL Path
         hsel_input = input_layers[DKey.HSEL]
         hsel_output = hsel_input
 
-        encoder = mlflow_log.get_model("80ffa7825f2a47feab265a6729f6fa5b", "encoder.keras")
+        encoder = mlflow_log.get_model("dbb2971d856c42a881d69c4d3a3b27cc", "encoder.keras")
         encoder.trainable = False
         hsel_output = encoder(hsel_output)
-        hsel_train = train.features[DKey.HSEL]
-        hsel_output = transform.create_minmax_layer(hsel_train, 100_000)(hsel_output)
-        hsel_output = Dense(64, "gelu")(hsel_output)
+        # (mins, maxs) = get_minmax(train.loader, DKey.HSEL)
+        # hsel_output = transform.create_minmax(mins, maxs)(hsel_output)
+        hsel_output = Dense(64, "relu")(hsel_output)
+        output_layers.append(hsel_output)
 
-        cpl_input = input_layers[DKey.CPL]
-        cpl_train = train.features[DKey.CPL]
-        cpl_output = transform.create_minmax_layer(cpl_train, 100_000)(cpl_input)
-        cpl_output = Dense(128, "gelu")(cpl_output)
-        cpl_output = Dense(32, "gelu")(cpl_output)
+        # CPL Path
+        if use_cpl:
+            cpl_input = input_layers[DKey.CPL]
+            (mins, maxs) = get_minmax(train.loader, DKey.CPL)
+            cpl_output = transform.create_minmax(mins, maxs)(cpl_input)
+            cpl_output = Dense(128, "relu")(cpl_output)
+            cpl_output = Dense(64, "relu")(cpl_output)
+            output_layers.append(cpl_output)
 
-        spress_input = input_layers[DKey.SURFACE_PRESSURE]
-        spress_train = train.features[DKey.SURFACE_PRESSURE]
-        spress_output = transform.create_minmax_layer(spress_train, 100_000)(spress_input)
+        # Spress Path
+        if use_spress:
+            spress_input = input_layers[DKey.SURFACE_PRESSURE]
+            (mins, maxs) = get_minmax(train.loader, DKey.SURFACE_PRESSURE)
+            spress_output = transform.create_minmax(mins, maxs)(spress_input)
+            output_layers.append(spress_output)
 
-        output = Concatenate()([hsel_output, cpl_output, spress_output])
+        output = Concatenate()(output_layers)
 
         size = trial.suggest_categorical("size", [128, 256, 512])
         count = trial.suggest_categorical("count", [2, 4, 8])
@@ -70,7 +92,7 @@ def _objective(trial: optuna.Trial):
         activation = trial.suggest_categorical("activation", ["gelu", "relu"])
         mlflow.log_param("activation", activation)
 
-        dropout_rate = trial.suggest_categorical("d_rate", [0.0, 0.05, 0.1, 0.2])
+        dropout_rate = trial.suggest_categorical("d_rate", [0.0, 0.05, 0.1])
         mlflow.log_param("dropout_rate", dropout_rate)
 
         dense_layers = mlp.get_dense_layers(
@@ -83,27 +105,31 @@ def _objective(trial: optuna.Trial):
         output = Dense(72)(dense_layers)
         model = keras.Model(list(input_layers.values()), output)
 
-        model.compile(optimizer=optimizers.Adam(), loss=losses.MAE, metrics=[metrics.MAE, metrics.MSE])
+        model.compile(
+            optimizer=optimizers.Adam(learning_rate=0.0005), loss=losses.MAE, metrics=[metrics.MAE, metrics.MSE]
+        )
         model.summary()
 
         # Training
-        batch_size = 2000
+        batch_size = 500
+        mlflow.log_param("memmap_batch_size", batch_size)
 
         train_batches = train.create_batches(batch_size)
         val_batches = validation.create_batches(batch_size)
         test_batches = test.create_batches(batch_size)
 
-        early_stopping = callbacks.EarlyStopping(patience=10, verbose=1)
         model.fit(
             train_batches,
             validation_data=val_batches,
             epochs=1000,
             verbose=1,
-            callbacks=[early_stopping],
+            callbacks=[
+                callbacks.EarlyStopping(monitor="val_loss", patience=5, verbose=1),
+            ],
         )
 
         # Evaluation
-        profile.log_eval_profile_plots(model, train, test, count=10000)
+        profile.log_eval_profile_plots(model, train, test, count=100000)
         test_metrics = log_eval_metrics(model, test_batches, "test")
 
         return test_metrics["loss"]

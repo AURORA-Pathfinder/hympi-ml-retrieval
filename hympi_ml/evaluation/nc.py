@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 from h5netcdf.legacyapi import Dataset
 from keras.models import Model
@@ -15,7 +17,7 @@ def generate_netcdf(
     model: Model,
     train: FullDaysDataset,
     test: FullDaysDataset,
-    validation: FullDaysDataset,
+    validation: Optional[FullDaysDataset],
     cloud_fraction: float,
     name_prefix: str,
 ):
@@ -33,15 +35,13 @@ def generate_netcdf(
         cloud_fraction (float): The cloud fraciton of the train, test, and validation datasets
         name_prefix (str): The prefix applied to the output file name
     """
+
     train_days = train.days
-    test_days = test.days
-    validation_days = validation.days
+    day_context = "train"
 
-    day_context = "test"
-
-    if day in train_days:
-        day_context = "train"
-    elif day in validation_days:
+    if day in test.days:
+        day_context = "test"
+    elif validation is not None and day in validation.days:
         day_context = "val"
 
     day_dataset = train
@@ -58,8 +58,9 @@ def generate_netcdf(
         nc.run_config = name_prefix
 
         nc.training_days = ",".join(train_days)
-        nc.validation_days = ", ".join(validation_days)
-        nc.test_days = ",".join(test_days)
+        if validation is not None:
+            nc.validation_days = ", ".join(validation.days)
+        nc.test_days = ",".join(test.days)
 
         nc.cf = str(cloud_fraction)  # TODO: Include CF in fulldays?
 
@@ -94,7 +95,12 @@ def generate_netcdf_from_run(run_id: str, day: str, cloud_fraction: float = 0.1)
 
     datasets = fd.get_datasets_from_run(run_id)
     test = datasets["test"]
-    validation = datasets["validation"]
+
+    if "validation" in datasets.keys():
+        validation = datasets["validation"]
+    else:
+        validation = None
+
     train = datasets["train"]
 
     generate_netcdf(
