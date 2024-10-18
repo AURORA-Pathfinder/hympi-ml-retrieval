@@ -2,13 +2,14 @@ import gc
 
 import mlflow
 import optuna
+import numpy as np
 import keras
 import keras.backend
 from keras import losses, metrics, callbacks, optimizers
-from keras.layers import LayerNormalization
 
 from hympi_ml.utils import mlflow_log
 from hympi_ml.data.fulldays import DKey, get_split_datasets
+from hympi_ml.data.fulldays.preprocessing import get_minmax
 from hympi_ml.layers import mlp, transform
 from hympi_ml.evaluation import log_eval_metrics, profile
 from hympi_ml.utils.gpu import set_gpus
@@ -45,24 +46,24 @@ def _objective(trial: optuna.Trial):
         hsel_input = input_layers[DKey.HSEL]
         hsel_output = hsel_input
 
-        hsel_train = train.features[DKey.HSEL]
-        hsel_output = transform.create_norm_layer(hsel_train, 100000)(hsel_output)
+        (mins, maxs) = get_minmax(train.loader, DKey.HSEL)
+        hsel_output = transform.create_minmax(mins, maxs)(hsel_output)
 
         size = trial.suggest_categorical("size", [128, 256, 512])
-        count = trial.suggest_categorical("count", [2, 4])
+        count = trial.suggest_categorical("count", [0, 1, 2, 3])
 
-        latent_size = trial.suggest_categorical("latent_size", [64, 128, 256])
+        latent_size = 64  # trial.suggest_categorical("latent_size", [32, 64, 128, 256])
         mlflow.log_param("latent_size", latent_size)
 
         activation = trial.suggest_categorical("activation", ["gelu", "relu"])
         mlflow.log_param("activation", activation)
 
-        dropout_rate = trial.suggest_categorical("d_rate", [0.0, 0.05, 0.1, 0.25])
+        dropout_rate = trial.suggest_categorical("d_rate", [0.0, 0.05, 0.1])
         mlflow.log_param("dropout_rate", dropout_rate)
 
         (ae_layers, enc_layers) = mlp.get_autoencoder_layers(
             input_layer=hsel_output,
-            input_size=hsel_train.data_shape[0],
+            input_size=train.features[DKey.HSEL].data_shape[0],
             encode_sizes=[size] * count,
             latent_size=latent_size,
             activation=activation,
@@ -76,7 +77,7 @@ def _objective(trial: optuna.Trial):
         model.summary()
 
         # Training
-        batch_size = 256
+        batch_size = 2000
 
         train_batches = train.create_batches(batch_size)
         val_batches = validation.create_batches(batch_size)
