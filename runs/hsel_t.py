@@ -87,7 +87,7 @@ def _objective(trial: optuna.Trial):
         output = Concatenate()(output_layers)
 
         size = trial.suggest_categorical("size", [128, 256, 512])
-        count = trial.suggest_categorical("count", [2, 4, 8])
+        count = trial.suggest_categorical("count", [2, 4])
 
         activation = trial.suggest_categorical("activation", ["gelu", "relu"])
         mlflow.log_param("activation", activation)
@@ -105,9 +105,7 @@ def _objective(trial: optuna.Trial):
         output = Dense(72)(dense_layers)
         model = keras.Model(list(input_layers.values()), output)
 
-        model.compile(
-            optimizer=optimizers.Adam(learning_rate=0.0005), loss=losses.MAE, metrics=[metrics.MAE, metrics.MSE]
-        )
+        model.compile(optimizer=optimizers.Adam(), loss=losses.MAE, metrics=[metrics.MAE, metrics.MSE])
         model.summary()
 
         # Training

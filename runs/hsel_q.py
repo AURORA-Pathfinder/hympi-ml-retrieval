@@ -105,9 +105,7 @@ def _objective(trial: optuna.Trial):
         output = Dense(72)(dense_layers)
         model = keras.Model(list(input_layers.values()), output)
 
-        model.compile(
-            optimizer=optimizers.Adam(learning_rate=0.0005), loss=losses.MAE, metrics=[metrics.MAE, metrics.MSE]
-        )
+        model.compile(optimizer=optimizers.Adam(), loss=losses.MAE, metrics=[metrics.MAE, metrics.MSE])
         model.summary()
 
         # Training
