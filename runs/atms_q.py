@@ -14,8 +14,7 @@ from hympi_ml.evaluation import log_eval_metrics, profile
 from hympi_ml.utils.gpu import set_gpus
 
 
-target_name = DKey.TEMPERATURE
-instrument = DKey.HD
+target_name = DKey.WATER_VAPOR
 
 
 def _objective(trial: optuna.Trial):
@@ -24,9 +23,9 @@ def _objective(trial: optuna.Trial):
 
     with mlflow.start_run(nested=True):
         use_cpl = trial.suggest_categorical("use_cpl", [True, False])
-        use_spress = False  # trial.suggest_categorical("use_spress", [True, False])
+        use_spress = trial.suggest_categorical("use_spress", [True, False])
 
-        features_names = [instrument]
+        features_names = [DKey.ATMS]
 
         if use_cpl:
             features_names.append(DKey.CPL)
@@ -57,35 +56,19 @@ def _objective(trial: optuna.Trial):
         input_layers = train.get_input_layers()
         output_layers = []
 
-        activation = trial.suggest_categorical("activation", ["gelu", "relu"])
-        mlflow.log_param("activation", activation)
-
-        ## HSEL Path
-        hsel_input = input_layers[instrument]
-        hsel_output = hsel_input
-
-        encoded_hsel = False  # trial.suggest_categorical("encoded_hsel", [True, False])
-        mlflow.log_param("encoded_hsel", encoded_hsel)
-
-        if encoded_hsel:
-            encoder = mlflow_log.get_model("dbb2971d856c42a881d69c4d3a3b27cc", "encoder.keras")
-            encoder.trainable = False
-            hsel_output = encoder(hsel_output)
-        else:
-            (mins, maxs) = get_minmax(train.loader, instrument)
-            hsel_output = transform.create_minmax(mins, maxs)(hsel_output)
-            hsel_output = Dense(128, activation)(hsel_output)
-            hsel_output = Dense(64, activation)(hsel_output)
-
-        output_layers.append(hsel_output)
+        # ATMS Path
+        atms_input = input_layers[DKey.ATMS]
+        (mins, maxs) = get_minmax(train.loader, DKey.ATMS)
+        atms_output = transform.create_minmax(mins, maxs)(atms_input)
+        output_layers.append(atms_output)
 
         # CPL Path
         if use_cpl:
             cpl_input = input_layers[DKey.CPL]
             (mins, maxs) = get_minmax(train.loader, DKey.CPL)
             cpl_output = transform.create_minmax(mins, maxs)(cpl_input)
-            cpl_output = Dense(128, activation)(cpl_output)
-            cpl_output = Dense(64, activation)(cpl_output)
+            cpl_output = Dense(128, "gelu")(cpl_output)
+            cpl_output = Dense(64, "gelu")(cpl_output)
             output_layers.append(cpl_output)
 
         # Surface Pressure Path
@@ -103,7 +86,10 @@ def _objective(trial: optuna.Trial):
         size = trial.suggest_categorical("size", [64, 128, 256])
         count = trial.suggest_categorical("count", [1, 2, 4])
 
-        dropout_rate = 0.0  # trial.suggest_categorical("d_rate", [0.01, 0.1])
+        activation = "gelu"  # trial.suggest_categorical("activation", ["gelu", "relu"])
+        mlflow.log_param("activation", activation)
+
+        dropout_rate = 0.0  # trial.suggest_categorical("d_rate", [0.0, 0.05, 0.1])
         mlflow.log_param("dropout_rate", dropout_rate)
 
         dense_layers = mlp.get_dense_layers(
@@ -130,10 +116,10 @@ def _objective(trial: optuna.Trial):
         model.fit(
             train_batches,
             validation_data=val_batches,
-            epochs=1000,
+            epochs=100,
             verbose=1,
             callbacks=[
-                callbacks.EarlyStopping(monitor="val_loss", patience=8, verbose=1),
+                callbacks.EarlyStopping(monitor="val_loss", patience=20, verbose=1),
             ],
         )
 
@@ -150,4 +136,4 @@ with mlflow_log.start_run(
     log_datasets=False,
 ):
     study = optuna.create_study(direction="minimize")
-    study.optimize(_objective, n_trials=5)
+    study.optimize(_objective, n_trials=10)
