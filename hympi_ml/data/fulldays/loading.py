@@ -105,7 +105,7 @@ class FullDaysLoader:
             case DKey.HD:
                 return hsel[:, 1433:1934]
             case DKey.HW:
-                return hsel[:, 1433:1957]
+                return hsel[:, 1934:1956]
             case DKey.HMW:
                 return hsel[:, -1]
 

@@ -60,12 +60,20 @@ def _objective(trial: optuna.Trial):
         hsel_input = input_layers[DKey.HSEL]
         hsel_output = hsel_input
 
-        encoder = mlflow_log.get_model("dbb2971d856c42a881d69c4d3a3b27cc", "encoder.keras")
-        encoder.trainable = False
-        hsel_output = encoder(hsel_output)
-        # (mins, maxs) = get_minmax(train.loader, DKey.HSEL)
-        # hsel_output = transform.create_minmax(mins, maxs)(hsel_output)
-        hsel_output = Dense(64, "relu")(hsel_output)
+        encoded_hsel = trial.suggest_categorical("encoded_hsel", [True, False])
+        mlflow.log_param("encoded_hsel", encoded_hsel)
+
+        if encoded_hsel:
+            encoder = mlflow_log.get_model("dbb2971d856c42a881d69c4d3a3b27cc", "encoder.keras")
+            encoder.trainable = False
+            hsel_output = encoder(hsel_output)
+        else:
+            (mins, maxs) = get_minmax(train.loader, DKey.HSEL)
+            hsel_output = transform.create_minmax(mins, maxs)(hsel_output)
+            hsel_output = Dense(512, "relu")(hsel_output)
+            hsel_output = Dense(256, "relu")(hsel_output)
+            hsel_output = Dense(128, "relu")(hsel_output)
+
         output_layers.append(hsel_output)
 
         # CPL Path
@@ -73,26 +81,29 @@ def _objective(trial: optuna.Trial):
             cpl_input = input_layers[DKey.CPL]
             (mins, maxs) = get_minmax(train.loader, DKey.CPL)
             cpl_output = transform.create_minmax(mins, maxs)(cpl_input)
-            cpl_output = Dense(128, "relu")(cpl_output)
-            cpl_output = Dense(64, "relu")(cpl_output)
+            cpl_output = Dense(128, "gelu")(cpl_output)
+            cpl_output = Dense(64, "gelu")(cpl_output)
             output_layers.append(cpl_output)
 
-        # Spress Path
+        # Surface Pressure Path
         if use_spress:
             spress_input = input_layers[DKey.SURFACE_PRESSURE]
             (mins, maxs) = get_minmax(train.loader, DKey.SURFACE_PRESSURE)
             spress_output = transform.create_minmax(mins, maxs)(spress_input)
             output_layers.append(spress_output)
 
-        output = Concatenate()(output_layers)
+        if len(output_layers) > 1:
+            output = Concatenate()(output_layers)
+        elif len(output_layers) == 1:
+            output = output_layers[0]
 
-        size = trial.suggest_categorical("size", [128, 256, 512])
-        count = trial.suggest_categorical("count", [2, 4, 8])
+        size = trial.suggest_categorical("size", [64, 128, 256])
+        count = trial.suggest_categorical("count", [1, 2, 4])
 
-        activation = trial.suggest_categorical("activation", ["gelu", "relu"])
+        activation = "gelu"  # trial.suggest_categorical("activation", ["gelu", "relu"])
         mlflow.log_param("activation", activation)
 
-        dropout_rate = trial.suggest_categorical("d_rate", [0.0, 0.05, 0.1])
+        dropout_rate = 0.0  # trial.suggest_categorical("d_rate", [0.0, 0.05, 0.1])
         mlflow.log_param("dropout_rate", dropout_rate)
 
         dense_layers = mlp.get_dense_layers(
@@ -109,7 +120,7 @@ def _objective(trial: optuna.Trial):
         model.summary()
 
         # Training
-        batch_size = 500
+        batch_size = 1024
         mlflow.log_param("memmap_batch_size", batch_size)
 
         train_batches = train.create_batches(batch_size)
@@ -119,10 +130,10 @@ def _objective(trial: optuna.Trial):
         model.fit(
             train_batches,
             validation_data=val_batches,
-            epochs=1000,
+            epochs=100,
             verbose=1,
             callbacks=[
-                callbacks.EarlyStopping(monitor="val_loss", patience=5, verbose=1),
+                callbacks.EarlyStopping(monitor="val_loss", patience=20, verbose=1),
             ],
         )
 
