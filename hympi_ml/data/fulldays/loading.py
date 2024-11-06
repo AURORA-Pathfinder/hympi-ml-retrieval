@@ -15,19 +15,18 @@ class DKey(str, Enum):
     def _generate_next_value_(name, *_):  # noqa: N805
         return name
 
-    HSEL = auto()
+    H1 = auto()
     HA = auto()
     HB = auto()
     HC = auto()
     HD = auto()
     HW = auto()
-    HMW = auto()
 
     ATMS = auto()
 
     CPL = auto()
 
-    LABELS_SCALAR = auto()
+    NATURE_SCALAR = auto()
     LATITUDE = auto()
     LONGITUDE = auto()
     PBLH = auto()
@@ -35,10 +34,12 @@ class DKey(str, Enum):
     SURFACE_PRESSURE = auto()
     SURFACE_TEMPERATURE = auto()
 
-    LABELS_TABLE = auto()
+    NATURE_TABLE = auto()
     PRESSURE = auto()
     TEMPERATURE = auto()
+    TEMPERATURE_14 = auto()
     WATER_VAPOR = auto()
+    WATER_VAPOR_14 = auto()
 
 
 class FullDaysLoader:
@@ -59,7 +60,7 @@ class FullDaysLoader:
         """
         Returns the directory where the fulldays data is being pulled from.
         """
-        return "/data/nature_run/fulldays_reduced"
+        return "/data/nature_run/fulldays_cpl"
 
     def get_data(self, key: DKey | str) -> MemmapSequence:
         """
@@ -87,57 +88,56 @@ class FullDaysLoader:
         """
         dir_path = f"{self.data_dir}/{day}/"
 
-        hsel = np.load(dir_path + "hsel.npy", mmap_mode="r")
-        atms = np.load(dir_path + "mh.npy", mmap_mode="r")
-        cpl = np.load(dir_path + "cpl.npy", mmap_mode="r")
-        scalar = np.load(dir_path + "scalar.npy", mmap_mode="r")
-        table = np.load(dir_path + "table.npy", mmap_mode="r")
+        nature_scalar = np.load(dir_path + "nature_scalar.npy", mmap_mode="r")
+        nature_table = np.load(dir_path + "nature_table.npy", mmap_mode="r")
 
         match key:
-            case DKey.HSEL:
-                return hsel
+            case DKey.H1:
+                return np.load(f"{dir_path}/h1.npy", mmap_mode="r")
             case DKey.HA:
-                return hsel[:, 0:471]
+                return np.load(f"{dir_path}/ha.npy", mmap_mode="r")
             case DKey.HB:
-                return hsel[:, 471:932]
+                return np.load(f"{dir_path}/hb.npy", mmap_mode="r")
             case DKey.HC:
-                return hsel[:, 932:1433]
+                return np.load(f"{dir_path}/hc.npy", mmap_mode="r")
             case DKey.HD:
-                return hsel[:, 1433:1934]
+                return np.load(f"{dir_path}/hd.npy", mmap_mode="r")
             case DKey.HW:
-                return hsel[:, 1934:1956]
-            case DKey.HMW:
-                return hsel[:, -1]
+                return np.load(f"{dir_path}/hw.npy", mmap_mode="r")
 
             case DKey.ATMS:
-                return atms
+                return np.load(dir_path + "mh.npy", mmap_mode="r")
 
             case DKey.CPL:
-                return cpl
+                return np.load(dir_path + "cpl.npy", mmap_mode="r")
 
-            case DKey.LABELS_SCALAR:
-                return scalar
+            case DKey.NATURE_SCALAR:
+                return nature_scalar
             case DKey.LATITUDE:
-                return scalar[:, 0]
+                return nature_scalar[:, 0]
             case DKey.LONGITUDE:
-                return scalar[:, 1]
+                return nature_scalar[:, 1]
             case DKey.LAND_FRACTION:
-                return scalar[:, 2]
+                return nature_scalar[:, 2]
             case DKey.SURFACE_PRESSURE:
-                return scalar[:, 3]
+                return nature_scalar[:, 3]
             case DKey.SURFACE_TEMPERATURE:
-                return scalar[:, 4]
+                return nature_scalar[:, 4]
             case DKey.PBLH:
-                return scalar[:, 13]
+                return nature_scalar[:, 13]
 
-            case DKey.LABELS_TABLE:
-                return table
+            case DKey.NATURE_TABLE:
+                return nature_table
             case DKey.PRESSURE:
-                return table[:, :, 0]
+                return nature_table[:, :, 0]
             case DKey.TEMPERATURE:
-                return table[:, :, 1]
+                return nature_table[:, :, 1]
+            case DKey.TEMPERATURE_14:
+                return nature_table[:, -14:, 1]
             case DKey.WATER_VAPOR:
-                return table[:, :, 2]
+                return nature_table[:, :, 2]
+            case DKey.WATER_VAPOR_14:
+                return nature_table[:, -14:, 2]
 
             case _:
                 raise Exception(f"No match for {str(key)} found in {dir_path}")

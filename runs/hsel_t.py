@@ -15,7 +15,7 @@ from hympi_ml.utils.gpu import set_gpus
 
 
 target_name = DKey.TEMPERATURE
-instrument = DKey.HD
+instrument = DKey.HSEL
 
 
 def _objective(trial: optuna.Trial):

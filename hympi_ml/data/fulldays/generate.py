@@ -49,30 +49,6 @@ def convert_to_reduced_npy():
         print("Done!")
 
 
-def load_old_fulldays(day: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Loads the complete fulldays datasets from the old .npz files.
-    This may take quite a while considering the hympi files alone are several hundreds of gigabytes.
-    """
-    base_path = "/data/nature_run/fulldays"
-
-    # HSEL
-    hsel_file = np.load(f"{base_path}/hympi_{day}.npz")
-    hsel_keys = sorted(hsel_file.keys())
-    hsel_data = [hsel_file[x] for x in hsel_keys]
-    hsel = np.hstack(hsel_data)
-
-    # MH
-    mh = np.load(f"{base_path}/MH_{day}.npz")["table"]
-
-    # Nature Run (scalar and table)
-    nrun_data = np.load(f"{base_path}/Nature_{day}.npz")
-    scalar = nrun_data["scalar"]
-    table = nrun_data["table"]
-
-    return (hsel, mh, scalar, table)
-
-
 def get_joined_cpl_data(day: str, scalar: np.ndarray, max_distance: int = 100_000) -> Tuple[np.ndarray, np.ndarray]:
     """
     Get's the CPL data that is spatially joined to the other datasets in Fulldays.
@@ -90,7 +66,7 @@ def get_joined_cpl_data(day: str, scalar: np.ndarray, max_distance: int = 100_00
     gdf_npz_uncorrected["index_npz"] = list(range(len(mh_times)))
     gdf_npz_uncorrected.set_crs(epsg=4326, inplace=True)
 
-    cpl_path = f"data/nature_run/fulldays/cpl_merged/cpl_all_{day}.pkl"
+    cpl_path = f"/data/nature_run/fulldays/cpl_merged/cpl_all_{day}.pkl"
     gdf_cpl_uncorrected = pd.read_pickle(cpl_path)
 
     # Project, this seems weird, fix this to be better
@@ -128,21 +104,24 @@ def get_joined_cpl_data(day: str, scalar: np.ndarray, max_distance: int = 100_00
     return (cpl, indices)
 
 
-def generate_fulldays(day: str, max_distance: int = 100000):
+def generate_fulldays_cpl(day: str, max_distance: int = 100000):
     """
-    Generates the fulldays dataset with all cloud fractions for a specific day.
-
-    Note that this loads the entirety of the old fulldays data for joining with CPL data later, this can take lots of
-    time as the full hsel data is several hundred gigabytes.
+    Generates the fulldays dataset with all cloud fractions for a specific day that also includes CPL (CPL Flag = 1)
     """
-    (hsel, mh, scalar, table) = load_old_fulldays(day)
+    print(f"Working on {day}!")
 
-    (cpl, indices) = get_joined_cpl_data(day, scalar, max_distance)
+    fd_path = f"/data/nature_run/fulldays/{day}"
+    nature_scalar = np.load(f"{fd_path}/nature_scalar.npy", mmap_mode="r")
 
-    dir_name = f"/data/nature_run/fulldays/{day}"
+    (cpl, indices) = get_joined_cpl_data(day, nature_scalar, max_distance)
 
-    np.save(f"{dir_name}/mh.npy", mh[indices])
-    np.save(f"{dir_name}/hsel.npy", hsel[indices])
-    np.save(f"{dir_name}/scalar.npy", scalar[indices])
-    np.save(f"{dir_name}/table.npy", table[indices])
+    dir_name = f"/data/nature_run/fulldays_cpl/{day}"
+    os.makedirs(dir_name)
+
+    files = ["ha", "hb", "hc", "hd", "hw", "h1", "mh", "nature_scalar", "nature_table"]
+
+    for file in files:
+        data = np.load(f"{fd_path}/{file}.npy", mmap_mode="r")
+        np.save(f"{dir_name}/{file}.npy", data[indices])
+
     np.save(f"{dir_name}/cpl.npy", cpl)

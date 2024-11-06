@@ -9,7 +9,7 @@ from keras.layers import Dense, Concatenate
 from hympi_ml.utils import mlflow_log
 from hympi_ml.data.fulldays import DKey, get_split_datasets
 from hympi_ml.data.fulldays.preprocessing import get_minmax
-from hympi_ml.layers import mlp, transform
+from hympi_ml.layers import mlp, transform, loss
 from hympi_ml.evaluation import log_eval_metrics, profile
 from hympi_ml.utils.gpu import set_gpus
 
@@ -22,7 +22,7 @@ def _objective(trial: optuna.Trial):
     keras.backend.clear_session()
 
     with mlflow.start_run(nested=True):
-        features_names = [DKey.HA, DKey.HB, DKey.HC, DKey.HD, DKey.HW]
+        features_names = [DKey.HA, DKey.HD, DKey.HW]
 
         use_cpl = trial.suggest_categorical("use_cpl", [True, False])
 
@@ -52,7 +52,7 @@ def _objective(trial: optuna.Trial):
         input_layers = train.get_input_layers()
         output_layers = []
 
-        activation = trial.suggest_categorical("activation", ["gelu", "relu"])
+        activation = "relu"  # trial.suggest_categorical("activation", ["relu"])
         mlflow.log_param("activation", activation)
 
         ## Path
@@ -63,9 +63,7 @@ def _objective(trial: optuna.Trial):
             (mins, maxs) = get_minmax(train.loader, name)
             out = transform.create_minmax(mins, maxs)(out)
 
-            # path_size = trial.suggest_categorical("path_size", [64])
-
-            if name != DKey.HW:
+            if name != DKey.HW and name != DKey.ATMS:
                 out = Dense(128, activation)(out)
                 out = Dense(64, activation)(out)
 
@@ -76,8 +74,8 @@ def _objective(trial: optuna.Trial):
         elif len(output_layers) == 1:
             output = output_layers[0]
 
-        size = trial.suggest_categorical("size", [128, 256])
-        count = trial.suggest_categorical("count", [0, 1, 2])
+        size = 128  # trial.suggest_categorical("size", [256])
+        count = trial.suggest_categorical("count", [1, 2])
 
         dropout_rate = 0.0  # trial.suggest_categorical("d_rate", [0.01, 0.1])
         mlflow.log_param("dropout_rate", dropout_rate)
@@ -89,10 +87,12 @@ def _objective(trial: optuna.Trial):
             dropout_rate=dropout_rate,
         )
 
-        output = Dense(72)(dense_layers)
+        output = Dense(train.target_shape[0])(dense_layers)
         model = keras.Model(list(input_layers.values()), output)
 
-        model.compile(optimizer=optimizers.Adam(), loss=losses.MAE, metrics=[metrics.MAE, metrics.MSE])
+        model.compile(
+            optimizer=optimizers.Adam(), loss=losses.MeanAbsolutePercentageError(), metrics=[metrics.MAE, metrics.MSE]
+        )
         model.summary()
 
         # Training
@@ -106,7 +106,7 @@ def _objective(trial: optuna.Trial):
         model.fit(
             train_batches,
             validation_data=val_batches,
-            epochs=100,
+            epochs=500,
             verbose=1,
             callbacks=[
                 callbacks.EarlyStopping(monitor="val_loss", patience=20, verbose=1),
@@ -126,4 +126,4 @@ with mlflow_log.start_run(
     log_datasets=False,
 ):
     study = optuna.create_study(direction="minimize")
-    study.optimize(_objective, n_trials=2)
+    study.optimize(_objective, n_trials=4)
