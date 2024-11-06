@@ -7,7 +7,7 @@ from hympi_ml.data.fulldays import DKey
 
 def get_formatted_units(key: DKey) -> str:
     match key:
-        case DKey.HSEL | DKey.HA | DKey.HB | DKey.HC | DKey.HD | DKey.HW | DKey.HMW | DKey.ATMS | DKey.CPL:
+        case DKey.H1 | DKey.HA | DKey.HB | DKey.HC | DKey.HD | DKey.HW | DKey.ATMS | DKey.CPL:
             return "Brightness Temperature (K)"
 
         case DKey.PBLH:
