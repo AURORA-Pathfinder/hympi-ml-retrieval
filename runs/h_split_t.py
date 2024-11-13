@@ -7,7 +7,7 @@ from keras import losses, metrics, callbacks, optimizers
 from keras.layers import Dense, Concatenate
 
 from hympi_ml.utils import mlflow_log
-from hympi_ml.data.fulldays import DKey, get_split_datasets
+from hympi_ml.data.fulldays import DKey, DPath, get_split_datasets
 from hympi_ml.data.fulldays.preprocessing import get_minmax
 from hympi_ml.layers import mlp, transform, loss
 from hympi_ml.evaluation import log_eval_metrics, profile
@@ -24,12 +24,11 @@ def _objective(trial: optuna.Trial):
     with mlflow.start_run(nested=True):
         features_names = [DKey.HA, DKey.HD, DKey.HW]
 
-        use_cpl = trial.suggest_categorical("use_cpl", [True, False])
-
-        if use_cpl:
+        if trial.suggest_categorical("use_cpl", [True]):
             features_names.append(DKey.CPL)
 
         (train, validation, test) = get_split_datasets(
+            loader_path=DPath.CPL_06,
             feature_names=features_names,
             target_name=target_name,
             train_days=[
@@ -52,7 +51,7 @@ def _objective(trial: optuna.Trial):
         input_layers = train.get_input_layers()
         output_layers = []
 
-        activation = "relu"  # trial.suggest_categorical("activation", ["relu"])
+        activation = "gelu"  # trial.suggest_categorical("activation", ["relu"])
         mlflow.log_param("activation", activation)
 
         ## Path
@@ -63,8 +62,10 @@ def _objective(trial: optuna.Trial):
             (mins, maxs) = get_minmax(train.loader, name)
             out = transform.create_minmax(mins, maxs)(out)
 
+            # out = keras.layers.LayerNormalization()(out)
+
             if name != DKey.HW and name != DKey.ATMS:
-                out = Dense(128, activation)(out)
+                out = Dense(256, activation)(out)
                 out = Dense(64, activation)(out)
 
             output_layers.append(out)
@@ -74,8 +75,8 @@ def _objective(trial: optuna.Trial):
         elif len(output_layers) == 1:
             output = output_layers[0]
 
-        size = 128  # trial.suggest_categorical("size", [256])
-        count = trial.suggest_categorical("count", [1, 2])
+        size = 256  # trial.suggest_categorical("size", [256])
+        count = 2  # trial.suggest_categorical("count", [2])
 
         dropout_rate = 0.0  # trial.suggest_categorical("d_rate", [0.01, 0.1])
         mlflow.log_param("dropout_rate", dropout_rate)
@@ -90,13 +91,17 @@ def _objective(trial: optuna.Trial):
         output = Dense(train.target_shape[0])(dense_layers)
         model = keras.Model(list(input_layers.values()), output)
 
+        lr = trial.suggest_float("lr", 5e-5, 5e-4, log=True)
+
         model.compile(
-            optimizer=optimizers.Adam(), loss=losses.MeanAbsolutePercentageError(), metrics=[metrics.MAE, metrics.MSE]
+            optimizer=optimizers.Adam(learning_rate=lr * 2),
+            loss=losses.MAE,
+            metrics=[metrics.MAE, metrics.MSE],
         )
         model.summary()
 
         # Training
-        batch_size = 1024
+        batch_size = 256
         mlflow.log_param("memmap_batch_size", batch_size)
 
         train_batches = train.create_batches(batch_size)
@@ -106,10 +111,10 @@ def _objective(trial: optuna.Trial):
         model.fit(
             train_batches,
             validation_data=val_batches,
-            epochs=500,
+            epochs=1000,
             verbose=1,
             callbacks=[
-                callbacks.EarlyStopping(monitor="val_loss", patience=20, verbose=1),
+                callbacks.EarlyStopping(monitor="val_loss", patience=5, verbose=1),
             ],
         )
 

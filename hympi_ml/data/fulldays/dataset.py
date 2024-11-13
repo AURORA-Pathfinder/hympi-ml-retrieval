@@ -15,7 +15,7 @@ from keras.layers import Input
 from keras.models import Model
 
 from hympi_ml.data.memmap import MemmapBatches, MemmapSequence
-from hympi_ml.data.fulldays.loading import DKey, FullDaysLoader
+from hympi_ml.data.fulldays.loading import DKey, DPath, FullDaysLoader
 from hympi_ml.utils import mlflow_log
 
 
@@ -33,11 +33,14 @@ class FullDaysDataset(Dataset):
         days: List[str],
         feature_names: List[DKey],
         target_name: DKey,
+        loader_path: DPath,
         source: Optional[DatasetSource] = None,
         name: Optional[str] = None,
     ):
         self._feature_names = feature_names
         self._target_name = target_name
+
+        self._loader = FullDaysLoader(days, loader_path)
 
         self.set_days(days)
 
@@ -57,16 +60,15 @@ class FullDaysDataset(Dataset):
         days = profile["days"]
         feature_names = list(profile["feature_shapes"].keys())
         target_name = profile["target_name"]
+        data_dir = profile["data_dir"]
 
-        return cls(days, feature_names, target_name)
+        return cls(days, feature_names, target_name, DPath(data_dir))
 
     def set_days(self, days: List[str]):
         """
         Sets the days that this dataset will load from.
         """
         self._days = days
-
-        self._loader = FullDaysLoader(days)
 
         self._features: Dict[str, MemmapSequence] = {}
         for data_name in self._feature_names:
@@ -229,6 +231,7 @@ class FullDaysDataset(Dataset):
 
 
 def get_split_datasets(
+    loader_path: DPath,
     feature_names: List[DKey],
     target_name: DKey,
     train_days: List[str],
@@ -237,18 +240,12 @@ def get_split_datasets(
     autolog: bool,
 ) -> Tuple[FullDaysDataset, FullDaysDataset, FullDaysDataset]:
     """
-    Gets data from a set of three FullDaysLoader and returns a tuple in the form of (train, validation, test)
+    Gets data from a set of three FullDaysDataset and returns a tuple in the form of (train, validation, test)
     """
 
-    train = FullDaysDataset(
-        days=train_days,
-        feature_names=feature_names,
-        target_name=target_name,
-    )
-
-    validation = FullDaysDataset(days=validation_days, feature_names=feature_names, target_name=target_name)
-
-    test = FullDaysDataset(days=test_days, feature_names=feature_names, target_name=target_name)
+    train = FullDaysDataset(train_days, feature_names, target_name, loader_path)
+    validation = FullDaysDataset(validation_days, feature_names, target_name, loader_path)
+    test = FullDaysDataset(test_days, feature_names, target_name, loader_path)
 
     if autolog:
         train.log("train")
