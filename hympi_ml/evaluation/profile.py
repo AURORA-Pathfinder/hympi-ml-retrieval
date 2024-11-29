@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List, Optional
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -6,10 +6,11 @@ from matplotlib.figure import Figure
 from keras.models import Model
 
 from hympi_ml.data.fulldays import FullDaysDataset, units
+from hympi_ml.data.fulldays.loading import DKey
 import hympi_ml.utils.mlflow_log as mlflow_log
 
 
-def plot_profiles(profiles: Dict[str, np.ndarray], value_axis: str, levels_axis: str = "Levels"):
+def plot_profiles(profiles: Dict[str, np.ndarray], value_axis: Optional[str] = None, levels_axis: str = "Levels"):
     """
     Given a dictionary of arrays that each represent a single profile, plots them into a common format used for
     profile figures. This includes a vertical, inverted x-axis with proper labels.
@@ -27,14 +28,16 @@ def plot_profiles(profiles: Dict[str, np.ndarray], value_axis: str, levels_axis:
         plt.plot(profile, range(len(profile)), ".-", label=label)
 
     ax = plt.gca()
+
+    if value_axis is None:
+        value_axis = "Values"
+
     ax.set_xlabel(value_axis)
     ax.set_ylabel(levels_axis)
     ax.invert_yaxis()
 
 
-def plot_mae(
-    model: Model, data: FullDaysDataset, context: str, count: int = 10000, show: bool = False, log: bool = False
-) -> Figure:
+def plot_mae(model: Model, data: FullDaysDataset, context: str, count: int = 10000, log: bool = False) -> List[Figure]:
     """
     Creates a figure that plots the mean absolute error per level of the
     predicted vs truthful data given a model and a FullDaysDataset.
@@ -47,29 +50,35 @@ def plot_mae(
         show (bool, optional): Whether to show this figure in the console. Defaults to False.
     """
     batches = data.create_batches(count)
-    (x, truth) = batches[0]
-    pred = model.predict(x, steps=1)
+    (x, truths) = batches[0]
+    preds = model.predict(x, steps=1)
 
-    mae_per_level = np.abs(pred - truth).mean(axis=0)
+    figs = []
 
-    fig = plt.figure()
-    formatted_unit = units.get_formatted_units(data.target_name)
-    plot_profiles({"Pred": mae_per_level}, value_axis=formatted_unit)
+    for i in range(len(truths)):
+        pred = preds[i]
+        truth = truths[i]
 
-    fig.suptitle(f"MAE Per Level ({count} {context} Values)")
+        mae_per_level = np.abs(pred - truth).mean(axis=0)
 
-    if show:
-        plt.show()
+        fig = plt.figure()
+        formatted_unit = units.get_formatted_units(data._target_names[i])
+        plot_profiles({"Pred": mae_per_level}, value_axis=formatted_unit)
+        plt.legend()
 
-    if log:
-        mlflow_log.log_figure(fig)
+        fig.suptitle(f"MAE Per Level ({count} {context} Values)")
 
-    return fig
+        if log:
+            mlflow_log.log_figure(fig)
+
+        figs.append(fig)
+
+    return figs
 
 
 def plot_var_comp(
-    model: Model, data: FullDaysDataset, context: str, count: int = 10000, show: bool = False, log: bool = False
-) -> Figure:
+    model: Model, data: FullDaysDataset, context: str, count: int = 10000, log: bool = False
+) -> List[Figure]:
     """
     Creates a figure that plots the variance of predicted and truth data for comparison.
     This can be useful for seeing if the model may be reducing to the mean of the input dataset.
@@ -82,31 +91,36 @@ def plot_var_comp(
         show (bool, optional): Whether to show this figure in the console. Defaults to False.
     """
     batches = data.create_batches(count)
-    (x, truth) = batches[0]
-    pred = model.predict(x, steps=1)
+    (x, truths) = batches[0]
+    preds = model.predict(x, steps=1)
 
-    var_pred = np.var(pred, axis=0)
-    var_truth = np.var(truth, axis=0)
+    figs = []
 
-    fig = plt.figure()
-    formatted_unit = units.get_formatted_units(data.target_name)
-    plot_profiles({"Pred": var_pred, "Truth": var_truth}, value_axis=formatted_unit)
-    plt.legend()
+    keys = list(data.targets.keys())
 
-    fig.suptitle(f"Pred v. True Variance ({count} {context} Values)")
+    for i in range(len(truths)):
+        pred = preds[i]
+        truth = truths[i]
 
-    if show:
-        plt.show()
+        var_pred = np.var(pred, axis=0)
+        var_truth = np.var(truth, axis=0)
 
-    if log:
-        mlflow_log.log_figure(fig)
+        fig = plt.figure()
+        value_label = units.get_formatted_units(DKey(keys[i]))
+        plot_profiles({"Pred": var_pred, "Truth": var_truth}, value_axis=value_label)
+        plt.legend()
 
-    return fig
+        fig.suptitle(f"{keys[i]} Pred v. True Variance ({count} {context} Values)")
+
+        if log:
+            mlflow_log.log_figure(fig)
+
+        figs.append(fig)
+
+    return figs
 
 
-def log_eval_profile_plots(
-    model: Model, train: FullDaysDataset, test: FullDaysDataset, count: int = 10000, show: bool = False
-):
+def log_eval_profile_plots(model: Model, train: FullDaysDataset, test: FullDaysDataset, count: int = 10000):
     """
     Logs the useful evaluation profile plots for the train and test sets automatically.
 
@@ -120,9 +134,9 @@ def log_eval_profile_plots(
         show (bool, optional): Whether to show this figure in the console. Defaults to False.
     """
     # Test
-    plot_var_comp(model=model, data=test, context="Test", count=count, log=True, show=show)
-    plot_mae(model=model, data=test, context="Test", count=count, log=True, show=show)
+    plot_var_comp(model=model, data=test, context="Test", count=count, log=True)
+    plot_mae(model=model, data=test, context="Test", count=count, log=True)
 
     # Train
-    plot_var_comp(model=model, data=train, context="Train", count=count, log=True, show=show)
-    plot_mae(model=model, data=train, context="Train", count=count, log=True, show=show)
+    plot_var_comp(model=model, data=train, context="Train", count=count, log=True)
+    plot_mae(model=model, data=train, context="Train", count=count, log=True)

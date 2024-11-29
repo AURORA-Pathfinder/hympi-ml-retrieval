@@ -4,7 +4,8 @@ import numpy as np
 import keras
 import keras.backend
 from keras import losses, metrics, callbacks, optimizers
-from keras.layers import Dense, Concatenate
+from keras.layers import Dense, Concatenate, GaussianNoise
+from keras import layers
 
 from hympi_ml.utils import mlflow_log
 from hympi_ml.data.fulldays import DKey, DPath, get_split_datasets
@@ -14,7 +15,7 @@ from hympi_ml.evaluation import log_eval_metrics, profile
 from hympi_ml.utils.gpu import set_gpus
 
 
-target_name = DKey.TEMPERATURE
+target_names = [DKey.TEMPERATURE, DKey.WATER_VAPOR]
 
 
 def _objective(trial: optuna.Trial):
@@ -23,14 +24,15 @@ def _objective(trial: optuna.Trial):
 
     with mlflow.start_run(nested=True):
         features_names = [DKey.HA, DKey.HD, DKey.HW]
+        # features_names = [DKey.ATMS]
 
-        if trial.suggest_categorical("use_cpl", [True]):
+        if trial.suggest_categorical("use_cpl", [True, False]):
             features_names.append(DKey.CPL)
 
         (train, validation, test) = get_split_datasets(
             loader_path=DPath.CPL_06,
             feature_names=features_names,
-            target_name=target_name,
+            target_names=target_names,
             train_days=[
                 "20060315",
                 "20060515",
@@ -62,11 +64,11 @@ def _objective(trial: optuna.Trial):
             (mins, maxs) = get_minmax(train.loader, name)
             out = transform.create_minmax(mins, maxs)(out)
 
-            # out = keras.layers.LayerNormalization()(out)
+            # if name != DKey.HW and name != DKey.ATMS:
+            #     out = Dense(128, activation)(out)
 
-            if name != DKey.HW and name != DKey.ATMS:
-                out = Dense(256, activation)(out)
-                out = Dense(64, activation)(out)
+            # out = Dense(128, activation)(out)
+            out = Dense(64, activation)(out)
 
             output_layers.append(out)
 
@@ -88,20 +90,24 @@ def _objective(trial: optuna.Trial):
             dropout_rate=dropout_rate,
         )
 
-        output = Dense(train.target_shape[0])(dense_layers)
-        model = keras.Model(list(input_layers.values()), output)
+        output_layers = train.get_output_layers()
 
-        lr = trial.suggest_float("lr", 5e-5, 5e-4, log=True)
+        for target in target_names:
+            output_layers[target] = output_layers[target](dense_layers)
+
+        model = keras.Model(list(input_layers.values()), list(output_layers.values()))
+
+        # lr = trial.suggest_float("lr", 5e-5, 5e-4, log=True)
 
         model.compile(
-            optimizer=optimizers.Adam(learning_rate=lr * 2),
-            loss=losses.MAE,
+            optimizer=optimizers.Adam(learning_rate=0.001, amsgrad=True),
+            loss=losses.MeanAbsolutePercentageError(),
             metrics=[metrics.MAE, metrics.MSE],
         )
         model.summary()
 
         # Training
-        batch_size = 256
+        batch_size = 1024
         mlflow.log_param("memmap_batch_size", batch_size)
 
         train_batches = train.create_batches(batch_size)
@@ -114,7 +120,8 @@ def _objective(trial: optuna.Trial):
             epochs=1000,
             verbose=1,
             callbacks=[
-                callbacks.EarlyStopping(monitor="val_loss", patience=5, verbose=1),
+                callbacks.EarlyStopping(monitor="val_loss", patience=10, verbose=1),
+                callbacks.ReduceLROnPlateau(patience=3, factor=0.5),
             ],
         )
 
@@ -127,7 +134,7 @@ def _objective(trial: optuna.Trial):
 
 with mlflow_log.start_run(
     tracking_uri="/data/nature_run/hympi-ml-retrieval/mlruns",
-    experiment_name=target_name.name,
+    experiment_name="+".join([key.name for key in target_names]),
     log_datasets=False,
 ):
     study = optuna.create_study(direction="minimize")
