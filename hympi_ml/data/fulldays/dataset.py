@@ -11,7 +11,7 @@ from mlflow.tracking.context import registry
 from mlflow.data.schema import TensorDatasetSchema, Schema
 from mlflow.types import TensorSpec
 
-from keras.layers import Input
+from keras.layers import Input, Dense
 from keras.models import Model
 
 from hympi_ml.data.memmap import MemmapBatches, MemmapSequence
@@ -32,13 +32,13 @@ class FullDaysDataset(Dataset):
         self,
         days: List[str],
         feature_names: List[DKey],
-        target_name: DKey,
+        target_names: List[DKey],
         loader_path: DPath,
         source: Optional[DatasetSource] = None,
         name: Optional[str] = None,
     ):
         self._feature_names = feature_names
-        self._target_name = target_name
+        self._target_names = target_names
 
         self._loader = FullDaysLoader(days, loader_path)
 
@@ -59,10 +59,15 @@ class FullDaysDataset(Dataset):
 
         days = profile["days"]
         feature_names = list(profile["feature_shapes"].keys())
-        target_name = profile["target_name"]
+
+        if "target_name" in profile:
+            target_names = [profile["target_name"]]
+        else:
+            target_names = list(profile["target_shapes"].keys())
+
         data_dir = profile["data_dir"]
 
-        return cls(days, feature_names, target_name, DPath(data_dir))
+        return cls(days, feature_names, target_names, DPath(data_dir))
 
     def set_days(self, days: List[str]):
         """
@@ -75,7 +80,10 @@ class FullDaysDataset(Dataset):
             seq = self._loader.get_data(data_name)
             self._features.update({data_name: seq})
 
-        self._target = self._loader.get_data(self._target_name)
+        self._targets: Dict[str, MemmapSequence] = {}
+        for data_name in self._target_names:
+            seq = self._loader.get_data(data_name)
+            self._targets.update({data_name: seq})
 
         self._digest = self._compute_digest()
 
@@ -92,16 +100,12 @@ class FullDaysDataset(Dataset):
         return {k: v.data_shape for k, v in self.features.items()}
 
     @property
-    def target(self) -> MemmapSequence:
-        return self._target
+    def targets(self) -> Dict[str, MemmapSequence]:
+        return self._targets
 
     @property
-    def target_name(self) -> str:
-        return self._target_name
-
-    @property
-    def target_shape(self) -> Tuple:
-        return self.target.data_shape
+    def target_shapes(self) -> Dict[str, Tuple]:
+        return {k: v.data_shape for k, v in self.targets.items()}
 
     @property
     def loader(self) -> FullDaysLoader:
@@ -117,8 +121,7 @@ class FullDaysDataset(Dataset):
             "days": self.days,
             "count": self.count,
             "feature_shapes": self.feature_shapes,
-            "target_name": self.target_name,
-            "target_shape": self.target_shape,
+            "target_shapes": self.target_shapes,
             "data_dir": self.loader.data_dir,
         }
 
@@ -128,16 +131,18 @@ class FullDaysDataset(Dataset):
             [TensorSpec(seq[0].dtype, seq.data_shape, name) for (name, seq) in self.features.items()]
         )
 
-        target_schema = Schema([TensorSpec(self.target[0].dtype, self.target.data_shape, self.target_name)])
+        targets_schema = Schema(
+            [TensorSpec(seq[0].dtype, seq.data_shape, name) for (name, seq) in self.targets.items()]
+        )
 
-        return TensorDatasetSchema(features=features_schema, targets=target_schema)
+        return TensorDatasetSchema(features=features_schema, targets=targets_schema)
 
     @property
     def count(self) -> int:
         """
         Returns the size of the dataset (simply the number of data points)
         """
-        return len(self.target)
+        return len(list(self.targets.values())[0])
 
     def _create_name(self) -> str:
         """
@@ -152,7 +157,7 @@ class FullDaysDataset(Dataset):
         Computes a digest for this dataset if none is proivded during initialization.
         """
         feature_list = list(self.feature_shapes.values())
-        target_list = list({self.target_name: self.target_shape}.values())
+        target_list = list(self.target_shapes.values())
 
         final_str = f"{feature_list}{target_list}{self.count}{self._days}"
 
@@ -184,7 +189,7 @@ class FullDaysDataset(Dataset):
         mlflow.log_input(self, context)
 
     def create_batches(self, batch_size: int) -> MemmapBatches:
-        return MemmapBatches(list(self.features.values()), self.target, batch_size)
+        return MemmapBatches(list(self.features.values()), list(self.targets.values()), batch_size)
 
     def get_latlon(self) -> Tuple[MemmapSequence, MemmapSequence]:
         lat = self.loader.get_data(DKey.LATITUDE)
@@ -199,20 +204,19 @@ class FullDaysDataset(Dataset):
         """
         return {k: v[index].reshape(1, -1) for k, v in self.features.items()}
 
-    def get_truth(self, index: int) -> Any:
-        """
-        Returns the value at a specific index of the target dataset.
-
-        This can be used to get the truth value at a defined index for evaluations.
-        """
-        return self.target[index]
-
     def get_input_layers(self) -> Dict[str, Any]:
         """
         Returns a dictionary of input layers for building Keras models based on the list
         features in this dataset.
         """
         return {k: Input(v.data_shape, name=k.name) for k, v in self.features.items()}
+
+    def get_output_layers(self) -> Dict[str, Dense]:
+        """
+        Returns a dictionary of input layers for building Keras models based on the list
+        features in this dataset.
+        """
+        return {k: Dense(v.data_shape[0], name=k.name) for k, v in self.targets.items()}
 
     def predict(self, model: Model, batch_size: int = 1024) -> np.ndarray:
         """
@@ -233,7 +237,7 @@ class FullDaysDataset(Dataset):
 def get_split_datasets(
     loader_path: DPath,
     feature_names: List[DKey],
-    target_name: DKey,
+    target_names: List[DKey],
     train_days: List[str],
     validation_days: List[str],
     test_days: List[str],
@@ -243,9 +247,9 @@ def get_split_datasets(
     Gets data from a set of three FullDaysDataset and returns a tuple in the form of (train, validation, test)
     """
 
-    train = FullDaysDataset(train_days, feature_names, target_name, loader_path)
-    validation = FullDaysDataset(validation_days, feature_names, target_name, loader_path)
-    test = FullDaysDataset(test_days, feature_names, target_name, loader_path)
+    train = FullDaysDataset(train_days, feature_names, target_names, loader_path)
+    validation = FullDaysDataset(validation_days, feature_names, target_names, loader_path)
+    test = FullDaysDataset(test_days, feature_names, target_names, loader_path)
 
     if autolog:
         train.log("train")

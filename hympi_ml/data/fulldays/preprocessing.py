@@ -1,5 +1,5 @@
 """
-Handles the generation and caching of preprocessing data specificlaly with fulldays datasets.
+Handles the generation and caching of preprocessing data with fulldays datasets.
 Can be used for creating preprocessing layers, etc.
 """
 

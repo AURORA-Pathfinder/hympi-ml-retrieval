@@ -133,13 +133,13 @@ class MemmapBatches(keras.utils.Sequence):
     def __init__(
         self,
         features: List[MemmapSequence],
-        target: MemmapSequence,
+        targets: List[MemmapSequence],
         batch_size: int,
         shuffle: bool = True,
         shuffle_seed: Optional[int] = None,
     ):
         self.features = features
-        self.target = target
+        self.targets = targets
 
         self.batch_size = batch_size
 
@@ -158,7 +158,7 @@ class MemmapBatches(keras.utils.Sequence):
         stop = start + self.batch_size
 
         x = [feature[start:stop] for feature in self.features]
-        y = self.target[start:stop]
+        y = [target[start:stop] for target in self.targets]
 
         return x, y
 
