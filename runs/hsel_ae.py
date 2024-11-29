@@ -16,7 +16,7 @@ from hympi_ml.utils.gpu import set_gpus
 
 
 def _objective(trial: optuna.Trial):
-    set_gpus(min_free=0.99)
+    set_gpus(min_free=0.8)
     keras.backend.clear_session()
     gc.collect()
 
@@ -52,7 +52,7 @@ def _objective(trial: optuna.Trial):
         size = trial.suggest_categorical("size", [128, 256, 512])
         count = trial.suggest_categorical("count", [0, 1, 2, 3])
 
-        latent_size = 64  # trial.suggest_categorical("latent_size", [32, 64, 128, 256])
+        latent_size = 500  # trial.suggest_categorical("latent_size", [32, 64, 128, 256])
         mlflow.log_param("latent_size", latent_size)
 
         activation = trial.suggest_categorical("activation", ["gelu", "relu"])

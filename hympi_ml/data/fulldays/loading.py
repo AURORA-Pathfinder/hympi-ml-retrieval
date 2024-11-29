@@ -16,18 +16,18 @@ class DKey(str, Enum):
         return name
 
     HSEL = auto()
+    H1 = auto()
     HA = auto()
     HB = auto()
     HC = auto()
     HD = auto()
     HW = auto()
-    HMW = auto()
 
     ATMS = auto()
 
     CPL = auto()
 
-    LABELS_SCALAR = auto()
+    NATURE_SCALAR = auto()
     LATITUDE = auto()
     LONGITUDE = auto()
     PBLH = auto()
@@ -35,31 +35,44 @@ class DKey(str, Enum):
     SURFACE_PRESSURE = auto()
     SURFACE_TEMPERATURE = auto()
 
-    LABELS_TABLE = auto()
+    NATURE_TABLE = auto()
     PRESSURE = auto()
     TEMPERATURE = auto()
     WATER_VAPOR = auto()
 
 
-class FullDaysLoader:
+class DPath(Enum):
     """
-    A class for loading Fulldays data initialized with a given number of days in the YYYYMMDD format.
+    An Enum that contains the list of. paths where data can be loaded from
     """
 
-    def __init__(self, days: List[str]) -> None:
-        """Initialize a FullDaysLoader with a list of days
+    ALL_06 = "/data/nature_run/fulldays"
+    "The entire 2006 dataset."
+
+    CPL_06 = "/data/nature_run/fulldays_cpl"
+    "A subset of ALL_06 with CPL_Flag = 1."
+
+    CPL_06_REDUCED = "/data/nature_run/fulldays_reduced"
+    "A subset of ALL_06 with CPL_Flag = 1 and cloud fraction <= 0.1."
+
+
+class FullDaysLoader:
+    """
+    A base class for loading days worth of data initialized with a given number of days in the YYYYMMDD format.
+    """
+
+    def __init__(self, days: List[str], data_path: DPath) -> None:
+        """Initialize a loader with a list of days
 
         Args:
             days (List[str]): the list of days to read from (format: YYYYMMDD)
         """
         self.days = days
+        self.dpath = data_path
 
     @property
     def data_dir(self) -> str:
-        """
-        Returns the directory where the fulldays data is being pulled from.
-        """
-        return "/data/nature_run/fulldays_reduced"
+        return self.dpath.value
 
     def get_data(self, key: DKey | str) -> MemmapSequence:
         """
@@ -83,61 +96,78 @@ class FullDaysLoader:
             Exception: If the day or key provided does not match any existing stored data.
 
         Returns:
-            np.memmap: _description_
+            np.memmap: A numpy memmap of the found dataset for the given day
         """
-        dir_path = f"{self.data_dir}/{day}/"
+        day_path = f"{self.data_dir}/{day}"
 
-        hsel = np.load(dir_path + "hsel.npy", mmap_mode="r")
-        atms = np.load(dir_path + "mh.npy", mmap_mode="r")
-        cpl = np.load(dir_path + "cpl.npy", mmap_mode="r")
-        scalar = np.load(dir_path + "scalar.npy", mmap_mode="r")
-        table = np.load(dir_path + "table.npy", mmap_mode="r")
+        if self.dpath == DPath.CPL_06_REDUCED:
+            nature_scalar = np.load(f"{day_path}/scalar.npy", mmap_mode="r")
+            nature_table = np.load(f"{day_path}/table.npy", mmap_mode="r")
+
+            hsel = np.load(f"{self.data_dir}/{day}/hsel.npy", mmap_mode="r")
+
+            match key:
+                case DKey.HSEL:
+                    return hsel
+                case DKey.HA:
+                    return hsel[:, 0:471]
+                case DKey.HB:
+                    return hsel[:, 471:932]
+                case DKey.HC:
+                    return hsel[:, 932:1433]
+                case DKey.HD:
+                    return hsel[:, 1433:1934]
+                case DKey.HW:
+                    return hsel[:, 1433:1957]
+        else:
+            match key:
+                case DKey.H1:
+                    return np.load(f"{day_path}/h1.npy", mmap_mode="r")
+                case DKey.HA:
+                    return np.load(f"{day_path}/ha.npy", mmap_mode="r")
+                case DKey.HB:
+                    return np.load(f"{day_path}/hb.npy", mmap_mode="r")
+                case DKey.HC:
+                    return np.load(f"{day_path}/hc.npy", mmap_mode="r")
+                case DKey.HD:
+                    return np.load(f"{day_path}/hd.npy", mmap_mode="r")
+                case DKey.HW:
+                    return np.load(f"{day_path}/hw.npy", mmap_mode="r")
+
+            nature_scalar = np.load(f"{day_path}/nature_scalar.npy", mmap_mode="r")
+            nature_table = np.load(f"{day_path}/nature_table.npy", mmap_mode="r")
+
+        if self.dpath == DPath.CPL_06 or self.dpath == DPath.CPL_06_REDUCED:
+            if key == DKey.CPL:
+                return np.load(f"{self.data_dir}/{day}/cpl.npy", mmap_mode="r")
 
         match key:
-            case DKey.HSEL:
-                return hsel
-            case DKey.HA:
-                return hsel[:, 0:471]
-            case DKey.HB:
-                return hsel[:, 471:932]
-            case DKey.HC:
-                return hsel[:, 932:1433]
-            case DKey.HD:
-                return hsel[:, 1433:1934]
-            case DKey.HW:
-                return hsel[:, 1433:1957]
-            case DKey.HMW:
-                return hsel[:, -1]
-
             case DKey.ATMS:
-                return atms
+                return np.load(f"{day_path}/mh.npy", mmap_mode="r")
 
-            case DKey.CPL:
-                return cpl
-
-            case DKey.LABELS_SCALAR:
-                return scalar
+            case DKey.NATURE_SCALAR:
+                return nature_scalar
             case DKey.LATITUDE:
-                return scalar[:, 0]
+                return nature_scalar[:, 0]
             case DKey.LONGITUDE:
-                return scalar[:, 1]
+                return nature_scalar[:, 1]
             case DKey.LAND_FRACTION:
-                return scalar[:, 2]
+                return nature_scalar[:, 2]
             case DKey.SURFACE_PRESSURE:
-                return scalar[:, 3]
+                return nature_scalar[:, 3]
             case DKey.SURFACE_TEMPERATURE:
-                return scalar[:, 4]
+                return nature_scalar[:, 4]
             case DKey.PBLH:
-                return scalar[:, 13]
+                return nature_scalar[:, 13]
 
-            case DKey.LABELS_TABLE:
-                return table
+            case DKey.NATURE_TABLE:
+                return nature_table
             case DKey.PRESSURE:
-                return table[:, :, 0]
+                return nature_table[:, :, 0]
             case DKey.TEMPERATURE:
-                return table[:, :, 1]
+                return nature_table[:, :, 1]
             case DKey.WATER_VAPOR:
-                return table[:, :, 2]
+                return nature_table[:, :, 2]
 
             case _:
-                raise Exception(f"No match for {str(key)} found in {dir_path}")
+                raise Exception(f"No match for DKey {str(key)} found in {self.dpath.name}")
