@@ -90,7 +90,7 @@ def generate_netcdf(
         z_pred[:, :] = pred
 
 
-def generate_netcdf_from_run(run_id: str, day: str, cloud_fraction: float = 0.1):
+def generate_netcdf_from_run(run_id: str, day: str, cloud_fraction: float = 1.0):
     loaded_model = mlflow_log.get_autolog_model(run_id)
 
     datasets = fd.get_datasets_from_run(run_id)

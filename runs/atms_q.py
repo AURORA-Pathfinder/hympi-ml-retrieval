@@ -14,7 +14,7 @@ from hympi_ml.evaluation import log_eval_metrics, profile
 from hympi_ml.utils.gpu import set_gpus
 
 
-target_name = DKey.TEMPERATURE
+target_name = DKey.WATER_VAPOR
 
 
 def _objective(trial: optuna.Trial):
@@ -23,15 +23,15 @@ def _objective(trial: optuna.Trial):
 
     with mlflow.start_run(nested=True):
         use_cpl = trial.suggest_categorical("use_cpl", [True, False])
-        # use_spress = trial.suggest_categorical("use_spress", [True, False])
+        use_spress = trial.suggest_categorical("use_spress", [True, False])
 
         features_names = [DKey.ATMS]
 
         if use_cpl:
             features_names.append(DKey.CPL)
 
-        # if use_spress:
-        #     features_names.append(DKey.SURFACE_PRESSURE)
+        if use_spress:
+            features_names.append(DKey.SURFACE_PRESSURE)
 
         (train, validation, test) = get_split_datasets(
             feature_names=features_names,
@@ -71,13 +71,20 @@ def _objective(trial: optuna.Trial):
             cpl_output = Dense(64, "gelu")(cpl_output)
             output_layers.append(cpl_output)
 
+        # Surface Pressure Path
+        if use_spress:
+            spress_input = input_layers[DKey.SURFACE_PRESSURE]
+            (mins, maxs) = get_minmax(train.loader, DKey.SURFACE_PRESSURE)
+            spress_output = transform.create_minmax(mins, maxs)(spress_input)
+            output_layers.append(spress_output)
+
         if len(output_layers) > 1:
             output = Concatenate()(output_layers)
         elif len(output_layers) == 1:
             output = output_layers[0]
 
         size = trial.suggest_categorical("size", [64, 128, 256])
-        count = trial.suggest_categorical("count", [1, 2])
+        count = trial.suggest_categorical("count", [1, 2, 4])
 
         activation = "gelu"  # trial.suggest_categorical("activation", ["gelu", "relu"])
         mlflow.log_param("activation", activation)
@@ -92,14 +99,14 @@ def _objective(trial: optuna.Trial):
             dropout_rate=dropout_rate,
         )
 
-        output = Dense(14)(dense_layers)
+        output = Dense(72)(dense_layers)
         model = keras.Model(list(input_layers.values()), output)
 
         model.compile(optimizer=optimizers.Adam(), loss=losses.MAE, metrics=[metrics.MAE, metrics.MSE])
         model.summary()
 
         # Training
-        batch_size = 32
+        batch_size = 1024
         mlflow.log_param("memmap_batch_size", batch_size)
 
         train_batches = train.create_batches(batch_size)
@@ -112,7 +119,7 @@ def _objective(trial: optuna.Trial):
             epochs=100,
             verbose=1,
             callbacks=[
-                callbacks.EarlyStopping(monitor="val_loss", patience=2, verbose=1),
+                callbacks.EarlyStopping(monitor="val_loss", patience=20, verbose=1),
             ],
         )
 
@@ -129,4 +136,4 @@ with mlflow_log.start_run(
     log_datasets=False,
 ):
     study = optuna.create_study(direction="minimize")
-    study.optimize(_objective, n_trials=2)
+    study.optimize(_objective, n_trials=10)
