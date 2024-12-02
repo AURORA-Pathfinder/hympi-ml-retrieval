@@ -5,7 +5,7 @@ Provides useful functions for related Dkey to units
 from hympi_ml.data.fulldays import DKey
 
 
-def get_formatted_units(key: DKey) -> str:
+def get_formatted_units(key: DKey) -> str | None:
     match key:
         case DKey.H1 | DKey.HA | DKey.HB | DKey.HC | DKey.HD | DKey.HW | DKey.ATMS | DKey.CPL:
             return "Brightness Temperature (K)"
@@ -21,3 +21,5 @@ def get_formatted_units(key: DKey) -> str:
 
         case DKey.WATER_VAPOR:
             return "Specific Humidity (q)"
+
+    return None
