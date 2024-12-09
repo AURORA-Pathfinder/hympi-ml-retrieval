@@ -68,6 +68,9 @@ def plot_profile_eval(
     (x, truths) = batches[0]
     preds = model.predict(x, steps=1)
 
+    if len(data.targets) == 1:
+        preds = [preds]
+
     figs = []
 
     keys = list(data.targets.keys())
@@ -120,44 +123,22 @@ def log_eval_profile_plots(model: Model, train: FullDaysDataset, test: FullDaysD
         count (int, optional): The number of data points to predict on. Defaults to 10000.
         show (bool, optional): Whether to show this figure in the console. Defaults to False.
     """
-    # Test
-    plot_profile_eval(
-        model=model,
-        data=test,
-        func=get_mae_profile,
-        title="MAE Per Level",
-        context="Test",
-        count=count,
-        log=True,
-    )
 
-    plot_profile_eval(
-        model=model,
-        data=test,
-        func=get_var_comp_profiles,
-        title="Pred v. Truth Variance",
-        context="Test",
-        count=count,
-        log=True,
-    )
+    profile_funcs = {
+        "MAE Per Level": get_mae_profile,
+        "Pred v. Truth Variance": get_var_comp_profiles,
+    }
 
-    # Train
-    plot_profile_eval(
-        model=model,
-        data=train,
-        func=get_mae_profile,
-        title="MAE Per Level",
-        context="Train",
-        count=count,
-        log=True,
-    )
+    for name, func in profile_funcs.items():
+        for context in ["Test", "Train"]:
+            data = test if context == "Test" else train
 
-    plot_profile_eval(
-        model=model,
-        data=train,
-        func=get_var_comp_profiles,
-        title="Pred v. Truth Variance",
-        context="Train",
-        count=count,
-        log=True,
-    )
+            plot_profile_eval(
+                model=model,
+                data=data,
+                func=func,
+                title=name,
+                context=context,
+                count=count,
+                log=True,
+            )
