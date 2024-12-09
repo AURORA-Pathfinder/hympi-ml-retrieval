@@ -9,7 +9,7 @@ from hympi_ml.data.fulldays.dataset import FullDaysDataset
 from hympi_ml.utils.gpu import set_gpus
 import hympi_ml.utils.mlflow_log as mlflow_log
 
-set_gpus(count=1)
+set_gpus(count=1, min_free=0.8)
 
 
 def generate_netcdf(
