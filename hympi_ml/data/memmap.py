@@ -1,9 +1,7 @@
-from typing import List, Optional, Tuple
-import math
+from typing import List, Tuple
 import collections.abc
 
 import numpy as np
-import keras.utils
 
 
 class MemmapSequence(collections.abc.Sequence):
@@ -121,46 +119,3 @@ class MemmapSequence(collections.abc.Sequence):
         Note: This may take a while if this sequence lots of data. Use wisely.
         """
         return np.concatenate(self.memmaps)
-
-
-class MemmapBatches(keras.utils.Sequence):
-    """
-    A Keras Sequence that generates data batches from MemmapSequences.
-
-    Meant to be used as both the features and targets for training models with Keras.
-    """
-
-    def __init__(
-        self,
-        features: List[MemmapSequence],
-        targets: List[MemmapSequence],
-        batch_size: int,
-        shuffle: bool = True,
-        shuffle_seed: Optional[int] = None,
-    ):
-        self.features = features
-        self.targets = targets
-
-        self.batch_size = batch_size
-
-        self.shuffle = shuffle
-        self.shuffle_seed = shuffle_seed
-        self.rng = np.random.default_rng(shuffle_seed)
-
-    def on_epoch_end(self):
-        self.rng = np.random.default_rng(self.shuffle_seed)
-
-    def __getitem__(self, index):
-        if self.shuffle:
-            index = self.rng.choice(self.__len__(), replace=False)
-
-        start = index * self.batch_size
-        stop = start + self.batch_size
-
-        x = [feature[start:stop] for feature in self.features]
-        y = [target[start:stop] for target in self.targets]
-
-        return x, y
-
-    def __len__(self):
-        return math.ceil(len(self.features[0]) / self.batch_size)
