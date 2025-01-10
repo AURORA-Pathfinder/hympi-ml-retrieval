@@ -1,7 +1,9 @@
 from typing import List
 from enum import Enum, auto
+import math
 
 import numpy as np
+import tensorflow as tf
 
 from hympi_ml.data.memmap import MemmapSequence
 
@@ -82,10 +84,46 @@ class FullDaysLoader:
         if isinstance(key, str):
             key = DKey[key.upper()]
 
-        memmaps = [self.find_memmap(day, key) for day in self.days]
+        memmaps = [self._find_memmap(day, key) for day in self.days]
         return MemmapSequence(memmaps)
 
-    def find_memmap(self, day: str, key: DKey) -> np.memmap:
+    def get_tf_dataset(self, key: DKey, load_batch_size: int = 1024) -> tf.data.Dataset:
+        """
+        Creates a tensorflow.data.Dataset for a specific DKey of data.
+
+        Args:
+            key (DKey): The DKey of the data to load and create the dataset
+            batch_size (int, optional): The size of the batches to load (purely for loading, the data does not come batched)
+                Defaults to 1024.
+
+        Returns:
+            tf.data.Dataset: The generated dataset.
+        """
+        data = self.get_data(key)
+
+        shape = (load_batch_size,) + data.data_shape
+
+        if shape == (load_batch_size, 1):
+            shape = (load_batch_size,)
+
+        batches = math.floor(len(data) / load_batch_size)
+
+        def gen():
+            for i in range(batches):
+                start = i * load_batch_size
+                stop = start + load_batch_size
+                yield data[start:stop]
+
+        return (
+            tf.data.Dataset.from_generator(
+                generator=gen,
+                output_signature=tf.TensorSpec(shape=shape, dtype=tf.float64, name=key),
+            )
+            .unbatch()
+            .apply(tf.data.experimental.assert_cardinality(batches * load_batch_size))
+        )
+
+    def _find_memmap(self, day: str, key: DKey) -> np.memmap:
         """Matches a given DataName to a specific memmap in a file on disk.
 
         Args:
@@ -170,4 +208,4 @@ class FullDaysLoader:
                 return nature_table[:, :, 2]
 
             case _:
-                raise Exception(f"No match for DKey {str(key)} found in {self.dpath.name}")
+                raise KeyError(f"No match for DKey {str(key)} found in {self.dpath.name}")

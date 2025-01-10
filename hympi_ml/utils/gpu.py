@@ -25,6 +25,15 @@ def set_gpus(count: int = 1, min_free: float = 0.99, verbose: bool = False):
         Exception: If no available GPUs are found with the provided parameters.
     """
 
+    os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
+
+    if count == 0:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        if verbose:
+            print("Set environment variable, CUDA_VISIBLE_DEVICES to an empty string.")
+
+        return
+
     cmd = "nvidia-smi --query-gpu=memory.free,memory.total --format=csv"
     lines = sb.check_output(cmd.split()).decode("ascii").splitlines()[1:]
 
@@ -53,7 +62,6 @@ def set_gpus(count: int = 1, min_free: float = 0.99, verbose: bool = False):
         raise Exception("Error attempting to find GPUs! No GPUs found that matched criteria! Please adjust parameters.")
 
     os.environ["CUDA_VISIBLE_DEVICES"] = env_str
-    os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"
 
     if verbose:
         print(f"Set environment variable, CUDA_VISIBLE_DEVICES, to {env_str}.")
