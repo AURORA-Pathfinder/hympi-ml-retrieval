@@ -11,7 +11,7 @@ import tensorflow as tf
 
 from hympi_ml.utils import mlflow_log
 from hympi_ml.data.fulldays import DKey, DPath, get_split_datasets
-from hympi_ml.layers import mlp
+from hympi_ml.layers import mlp, noise
 from hympi_ml.evaluation import figs
 from hympi_ml.utils.gpu import set_gpus
 
@@ -27,7 +27,7 @@ def _objective(trial: optuna.Trial):
         feature_names = [DKey.HA, DKey.HD, DKey.HW]
         # feature_names = [DKey.ATMS]
 
-        if trial.suggest_categorical("use_cpl", [True]):
+        if trial.suggest_categorical("use_cpl", [False]):
             feature_names.append(DKey.CPL)
 
         (train, validation, test) = get_split_datasets(
@@ -70,12 +70,14 @@ def _objective(trial: optuna.Trial):
 
             size = train.feature_shapes[name][0]
 
+            out = noise.add_nedt_layer(out, name)
+
             out = LayerNormalization()(out)
 
             if size > 32:
-                out = Dense(size / 2, activation)(out)
-                out = Dense(size / 4, activation)(out)
                 out = Dense(size / 8, activation)(out)
+                # out = Dense(size / 4, activation)(out)
+                # out = Dense(size / 8, activation)(out)
 
             output_layers.append(out)
 
@@ -109,7 +111,7 @@ def _objective(trial: optuna.Trial):
         model.summary()
 
         # Training
-        batch_size = 256
+        batch_size = 1024
         mlflow.log_param("data_batch_size", batch_size)
 
         train_ds = (
