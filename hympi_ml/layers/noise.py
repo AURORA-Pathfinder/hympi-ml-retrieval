@@ -63,7 +63,6 @@ HW_BW = [
 class PerBandNoise(Layer):
     def __init__(self, nedt: List[float]):
         super().__init__()
-        self.trainable = False
         self.nedt = nedt
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
@@ -84,9 +83,12 @@ class PerBandNoise(Layer):
 
         return tf.add(inputs, noise)
 
+    def get_config(self):
+        return {"nedt": self.nedt}
+
 
 def get_hympi_nedt(bandwidth: float) -> float:
-    """Calculates the noise using the algorithm developed by Narges
+    """Calculates the noise using the algorithm developed by Narges.
 
     Args:
         noise_factor (float): The noise factor.
@@ -107,7 +109,6 @@ def get_hympi_nedt(bandwidth: float) -> float:
 class HympiNoise(Layer):
     def __init__(self, bandwidth: float):
         super().__init__()
-        self.trainable = False
         self.bandwidth = bandwidth
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
@@ -116,15 +117,45 @@ class HympiNoise(Layer):
         seed = tf.cast(flat_inputs[:2], tf.int32)
 
         nedt = get_hympi_nedt(self.bandwidth)
-        noise = tf.random.stateless_normal(shape=inputs.shape[1:], stddev=nedt, seed=seed)
 
+        shape = inputs.shape
+        if shape[0] is None:
+            shape = shape[1:]
+
+        noise = tf.random.stateless_normal(shape=shape, stddev=nedt, seed=seed)
         return tf.add(inputs, noise)
+
+    def get_config(self):
+        return {"bandwidth": self.bandwidth}
+
+
+def get_nedt_layer(key: DKey) -> Layer | None:
+    """Returns a custom Keras layer that applies noise to the input based on the data from
+    the provided DKey. If the DKey does not have an existing NEDT layer, this function returns None.
+    """
+
+    match key:
+        case DKey.ATMS:
+            return PerBandNoise(ATMS_NEDT)
+        case DKey.HW:
+            hw_nedt = [get_hympi_nedt(bw) for bw in HW_BW]
+            return PerBandNoise(hw_nedt)
+        case DKey.HA | DKey.HB:
+            return HympiNoise(0.01)
+        case DKey.HC:
+            return HympiNoise(0.02)
+        case DKey.HD:
+            return HympiNoise(0.04)
+        case DKey.H1:
+            return HympiNoise(0.5)
+        case _:
+            return None
 
 
 def add_nedt_layer(input_layer: Layer, key: DKey) -> Layer:
     """
     Adds a Noise Equivalent Differential Temperature to the given input layer based on the given DKey.
-    If the the DKey does not have an existing nedt, it will simply return the input layer.
+
 
     Args:
         input_layer (Layer): The layer to add the noise layer to.
@@ -132,20 +163,11 @@ def add_nedt_layer(input_layer: Layer, key: DKey) -> Layer:
 
     Returns:
         Layer: A new layer with noise added to the input layer (uses Keras functional layers).
+            If the the DKey does not have an existing nedt, it will simply return the input layer.
     """
-    match key:
-        case DKey.ATMS:
-            return PerBandNoise(ATMS_NEDT)(input_layer)
-        case DKey.HW:
-            hw_nedt = [get_hympi_nedt(bw) for bw in HW_BW]
-            return PerBandNoise(hw_nedt)(input_layer)
-        case DKey.HA | DKey.HB:
-            return HympiNoise(0.01)(input_layer)
-        case DKey.HC:
-            return HympiNoise(0.02)(input_layer)
-        case DKey.HD:
-            return HympiNoise(0.04)(input_layer)
-        case DKey.H1:
-            return HympiNoise(0.5)(input_layer)
-        case _:
-            return input_layer
+    layer = get_nedt_layer(key)
+
+    if layer is not None:
+        return (layer)(input_layer)
+
+    return input_layer

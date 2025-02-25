@@ -105,7 +105,7 @@ def generate_netcdf(
         spr[:] = lat_lon_spress[:, 2]
 
 
-def generate_netcdf_from_run(run_id: str, day: str):
+def generate_netcdf_from_run(run_id: str, day: str, name_prefix: str | None = None):
     loaded_model = mlflow_log.get_autolog_model(run_id)
 
     datasets = get_datasets_from_run(run_id)
@@ -131,5 +131,5 @@ def generate_netcdf_from_run(run_id: str, day: str):
         test=test,
         validation=validation,
         cloud_fraction=cloud_fraction,
-        name_prefix=f"{run_id}",
+        name_prefix=f"{run_id}_{name_prefix}",
     )
