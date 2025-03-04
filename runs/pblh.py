@@ -1,11 +1,8 @@
 import gc
-from typing import List
 
 import mlflow
 import keras
-import keras.backend
-from keras import losses, metrics, callbacks, optimizers
-from keras.layers import Dense, Concatenate, LayerNormalization
+from keras import losses, metrics, callbacks, optimizers, layers
 import tensorflow as tf
 
 from hympi_ml.utils import mlflow_log
@@ -17,7 +14,7 @@ from hympi_ml.utils.gpu import set_gpus
 target_names = [DKey.PBLH]
 
 
-def start_run(feature_names: List[DKey], add_nedt: bool):
+def start_run(feature_names: list[DKey], add_nedt: bool):
     set_gpus(min_free=0.8)
     keras.backend.clear_session()
     gc.collect()
@@ -68,17 +65,17 @@ def start_run(feature_names: List[DKey], add_nedt: bool):
             if add_nedt:
                 out = noise.add_nedt_layer(out, name)
 
-            out = LayerNormalization()(out)
+            out = layers.LayerNormalization()(out)
 
             if size > 32:
-                # out = Dense(size / 2, activation)(out)
-                out = Dense(size / 4, activation)(out)
-                out = Dense(size / 8, activation)(out)
+                # out = layers.Dense(size / 2, activation)(out)
+                out = layers.Dense(size / 4, activation)(out)
+                out = layers.Dense(size / 8, activation)(out)
 
             output_layers.append(out)
 
         if len(output_layers) > 1:
-            output = Concatenate()(output_layers)
+            output = layers.Concatenate()(output_layers)
         else:
             output = output_layers[0]
 

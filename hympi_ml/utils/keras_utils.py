@@ -1,10 +1,10 @@
-from typing import Dict, Any
+from typing import Any
 
 from keras import Input, Model, layers
 import numpy as np
 
 
-def create_identity_model(input_shapes: Dict[str, tuple]) -> Model:
+def create_identity_model(input_shapes: dict[str, tuple]) -> Model:
     """
     Creates a model that outputs its inputs. This is meant to be a model that can quickly
     take the inputs and output them using the GPU by using this model's predict function.
@@ -21,7 +21,7 @@ def create_identity_model(input_shapes: Dict[str, tuple]) -> Model:
     return Model(inputs, outs)
 
 
-def predict_dict(model: Model, dataset: Any) -> Dict[str, np.ndarray]:
+def predict_dict(model: Model, dataset: Any) -> dict[str, np.ndarray]:
     """
     Predicts on the given model with the provided input but organizes the output
     as a dictionary based on the names of the outputs in the model.
@@ -33,7 +33,7 @@ def predict_dict(model: Model, dataset: Any) -> Dict[str, np.ndarray]:
         dataset (Any): The prediction input (either a tf.data.Dataset or a keras Sequence or some other format)
 
     Returns:
-        Dict[str, np.ndarray]: The dictionary of outputs with keys as target names.
+        dict[str, np.ndarray]: The dictionary of outputs with keys as target names.
     """
     preds = model.predict(dataset)
 

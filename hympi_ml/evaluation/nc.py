@@ -1,8 +1,8 @@
 from typing import Optional
 
 import numpy as np
-from h5netcdf.legacyapi import Dataset
-from keras.models import Model
+from netCDF4 import Dataset
+import keras
 
 from hympi_ml.data.fulldays.dataset import FullDaysDataset, get_datasets_from_run
 from hympi_ml.data.fulldays.loading import DPath, DKey
@@ -14,7 +14,7 @@ set_gpus(min_free=0.8)
 
 def generate_netcdf(
     day: str,
-    model: Model,
+    model: keras.Model,
     train: FullDaysDataset,
     test: FullDaysDataset,
     validation: Optional[FullDaysDataset],

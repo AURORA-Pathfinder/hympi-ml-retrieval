@@ -1,4 +1,3 @@
-from typing import List, Tuple
 import collections.abc
 
 import numpy as np
@@ -12,7 +11,7 @@ class MemmapSequence(collections.abc.Sequence):
     as if it were one concatenated array.
     """
 
-    def __init__(self, memmaps: List[np.memmap]):
+    def __init__(self, memmaps: list[np.memmap]):
         ref_shape = memmaps[0].shape[1:]
         for m in memmaps:
             if m.shape[1:] != ref_shape:
@@ -23,7 +22,7 @@ class MemmapSequence(collections.abc.Sequence):
         self.memmaps = memmaps
 
     @classmethod
-    def from_files(cls, file_paths: List[str]):
+    def from_files(cls, file_paths: list[str]):
         """
         Creates a new Memmaps from a set of '.npy' file paths by loading each file in "read" mode.
         """
@@ -94,7 +93,7 @@ class MemmapSequence(collections.abc.Sequence):
             return np.array(samples)
 
     @property
-    def data_shape(self) -> Tuple:
+    def data_shape(self) -> tuple[int, ...]:
         """
         Returns the shape of the first index of the dataset
         """
@@ -106,7 +105,7 @@ class MemmapSequence(collections.abc.Sequence):
         return shape
 
     @property
-    def shape(self) -> Tuple:
+    def shape(self) -> tuple[int, ...]:
         """
         Returns the shape of the combined set of the memmaps
         """

@@ -1,9 +1,6 @@
-from typing import List
 import math
 
-from keras.layers import Layer
-from keras.saving.object_registration import register_keras_serializable
-
+import keras
 import tensorflow as tf
 
 from hympi_ml.data.fulldays.loading import DKey
@@ -59,9 +56,9 @@ HW_BW = [
 ]
 
 
-@register_keras_serializable()
-class PerBandNoise(Layer):
-    def __init__(self, nedt: List[float]):
+@keras.saving.register_keras_serializable()
+class PerBandNoise(keras.Layer):
+    def __init__(self, nedt: list[float]):
         super().__init__()
         self.nedt = nedt
 
@@ -105,8 +102,8 @@ def get_hympi_nedt(bandwidth: float) -> float:
     return t_sys / math.sqrt(bandwidth * 1e9 * tau)
 
 
-@register_keras_serializable()
-class HympiNoise(Layer):
+@keras.saving.register_keras_serializable()
+class HympiNoise(keras.Layer):
     def __init__(self, bandwidth: float):
         super().__init__()
         self.bandwidth = bandwidth
@@ -129,7 +126,7 @@ class HympiNoise(Layer):
         return {"bandwidth": self.bandwidth}
 
 
-def get_nedt_layer(key: DKey) -> Layer | None:
+def get_nedt_layer(key: DKey) -> keras.Layer | None:
     """Returns a custom Keras layer that applies noise to the input based on the data from
     the provided DKey. If the DKey does not have an existing NEDT layer, this function returns None.
     """
@@ -152,7 +149,7 @@ def get_nedt_layer(key: DKey) -> Layer | None:
             return None
 
 
-def add_nedt_layer(input_layer: Layer, key: DKey) -> Layer:
+def add_nedt_layer(input_layer: keras.Layer, key: DKey) -> keras.Layer:
     """
     Adds a Noise Equivalent Differential Temperature to the given input layer based on the given DKey.
 
