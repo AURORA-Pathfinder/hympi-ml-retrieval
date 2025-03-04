@@ -1,8 +1,7 @@
 import gc
+from typing import List
 
 import mlflow
-import optuna
-import numpy as np
 import keras
 import keras.backend
 from keras import losses, metrics, callbacks, optimizers
@@ -11,25 +10,19 @@ import tensorflow as tf
 
 from hympi_ml.utils import mlflow_log
 from hympi_ml.data.fulldays import DKey, DPath, get_split_datasets
-from hympi_ml.layers import mlp
+from hympi_ml.layers import mlp, noise
 from hympi_ml.evaluation import figs
 from hympi_ml.utils.gpu import set_gpus
 
 target_names = [DKey.TEMPERATURE, DKey.WATER_VAPOR]
 
 
-def _objective(trial: optuna.Trial):
+def start_run(feature_names: List[DKey], add_nedt: bool):
     set_gpus(min_free=0.8)
     keras.backend.clear_session()
     gc.collect()
 
     with mlflow.start_run(nested=True):
-        feature_names = [DKey.HA, DKey.HD, DKey.HW]
-        # feature_names = [DKey.ATMS]
-
-        if trial.suggest_categorical("use_cpl", [True, False]):
-            feature_names.append(DKey.CPL)
-
         (train, validation, test) = get_split_datasets(
             data_path=DPath.CPL_06,
             train_days=[
@@ -61,12 +54,17 @@ def _objective(trial: optuna.Trial):
         activation = "gelu"
         mlflow.log_param("activation", activation)
 
+        mlflow.log_param("add_nedt", add_nedt)
+
         ## Path
         for name in feature_names:
             input_layer = input_layers[name]
             out = input_layer
 
             size = train.feature_shapes[name][0]
+
+            if add_nedt:
+                out = noise.add_nedt_layer(out, name)
 
             out = LayerNormalization()(out)
 
@@ -75,6 +73,7 @@ def _objective(trial: optuna.Trial):
                 out = Dense(size / 4, activation)(out)
                 out = Dense(size / 8, activation)(out)
 
+
             output_layers.append(out)
 
         if len(output_layers) > 1:
@@ -82,12 +81,12 @@ def _objective(trial: optuna.Trial):
         else:
             output = output_layers[0]
 
-        dropout_rate = 0.0  # trial.suggest_categorical("d_rate", [0.0, 0.1])
+        dropout_rate = 0.0
         mlflow.log_param("dropout_rate", dropout_rate)
 
         dense_layers = mlp.get_dense_layers(
             input_layer=output,
-            sizes=[256, 128],
+            sizes=[128, 128, 128],
             activation=activation,
             dropout_rate=dropout_rate,
         )
@@ -107,7 +106,7 @@ def _objective(trial: optuna.Trial):
         model.summary()
 
         # Training
-        batch_size = 256
+        batch_size = 512
         mlflow.log_param("data_batch_size", batch_size)
 
         train_ds = (
@@ -126,8 +125,8 @@ def _objective(trial: optuna.Trial):
             epochs=1000,
             verbose=1,
             callbacks=[
-                callbacks.EarlyStopping(monitor="val_loss", patience=5, verbose=1, min_delta=0.0001),
-                callbacks.ReduceLROnPlateau(patience=3, factor=0.5, min_lr=1e-6),
+                callbacks.EarlyStopping(monitor="val_loss", patience=8, verbose=1, min_delta=0.0001),
+                callbacks.ReduceLROnPlateau(patience=4, factor=0.5, min_lr=1e-6),
             ],
         )
 
@@ -142,8 +141,7 @@ def _objective(trial: optuna.Trial):
                 figs.VarCompProfile(),
             ],
         )
-        test_metrics = test.evaluate(model, metrics=["mae", "mse"], context="test", unscale=True, log=True)
-        return list(test_metrics.values())[0]
+        test.evaluate(model, metrics=["mae", "mse"], context="test", unscale=True, log=True)
 
 
 with mlflow_log.start_run(
@@ -151,5 +149,8 @@ with mlflow_log.start_run(
     experiment_name="+".join([key.name for key in target_names]),
     log_datasets=False,
 ):
-    study = optuna.create_study(direction="minimize")
-    study.optimize(_objective, n_trials=1)
+    # start_run(feature_names=[DKey.ATMS], add_nedt=True)
+    # start_run(feature_names=[DKey.ATMS, DKey.CPL], add_nedt=False)
+    # start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW], add_nedt=True)
+    # start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW, DKey.CPL], add_nedt=True)
+    # start_run(feature_names=[DKey.CPL], add_nedt=True)
