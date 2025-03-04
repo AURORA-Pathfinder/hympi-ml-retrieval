@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.ticker import PercentFormatter
-from keras.models import Model
+import keras
 
 from hympi_ml.data.fulldays import units, DKey
 from hympi_ml.data.fulldays.dataset import FullDaysDataset, get_datasets_from_run
@@ -214,7 +214,7 @@ def plot_eval_figures(
 
 
 def get_eval_figs(
-    model: Model,
+    model: keras.Model,
     datasets: Dict[str, FullDaysDataset],
     eval_figures: List[EvalFigure],
     log: bool = False,

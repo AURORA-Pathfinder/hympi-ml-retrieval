@@ -1,18 +1,17 @@
-from typing import List, Tuple, Dict, Any
+from typing import Any
 import json
 import hashlib
 
 import tensorflow as tf
+import keras
 import numpy as np
+
 import mlflow
 import mlflow.types
 from mlflow.data.dataset import Dataset, DatasetSource
 from mlflow.data.code_dataset_source import CodeDatasetSource
 from mlflow.tracking.context import registry
 from mlflow.data.schema import TensorDatasetSchema, Schema
-
-from keras.layers import Input, Dense, Lambda
-from keras.models import Model
 
 from hympi_ml.data.fulldays.loading import DKey, DPath, FullDaysLoader
 from hympi_ml.utils import mlflow_log, keras_utils
@@ -29,12 +28,12 @@ class FullDaysDataset(Dataset):
 
     def __init__(
         self,
-        days: List[str],
+        days: list[str],
         data_path: DPath,
-        feature_names: List[DKey],
-        target_names: List[DKey],
-        scale_ranges: Dict[DKey, Tuple[Any, Any]] | None = None,
-        filters: Dict[DKey, List[Tuple[Any, Any]]] | None = None,
+        feature_names: list[DKey],
+        target_names: list[DKey],
+        scale_ranges: dict[DKey, tuple[Any, Any]] | None = None,
+        filters: dict[DKey, list[tuple[Any, Any]]] | None = None,
     ):
         self._feature_names = feature_names
         self._target_names = target_names
@@ -72,7 +71,7 @@ class FullDaysDataset(Dataset):
 
         return cls(days, DPath[data_path], feature_names, target_names, scale_ranges, filters)
 
-    def set_days(self, days: List[str]):
+    def set_days(self, days: list[str]):
         """
         Sets the days that this dataset will load from.
         """
@@ -121,7 +120,7 @@ class FullDaysDataset(Dataset):
 
         return dataset.map(split, num_parallel_calls=tf.data.AUTOTUNE)
 
-    def as_tf_dataset(self, scale_targets: bool = True, keys: List[DKey] | None = None) -> tf.data.Dataset:
+    def as_tf_dataset(self, scale_targets: bool = True, keys: list[DKey] | None = None) -> tf.data.Dataset:
         """
         Generates a TensorFlow Dataset for the features and targets in this FullDaysDataset.
         By default, the dataset has elements in the form of a tuple containing (features, targets) as dictionaries.
@@ -130,7 +129,7 @@ class FullDaysDataset(Dataset):
         Args:
             scale_targets (bool, optional): Whether to scale the targets of the dataset when generating.
                 Note that this won't apply if the "keys" parameter is set. Defaults to True.
-            keys (List[DKey] | None, optional): A set of specific keys that the dataset will contain. Note that
+            keys (list[DKey] | None, optional): A set of specific keys that the dataset will contain. Note that
                 this will result in just those keys, not features and targets. Defaults to None.
 
         Returns:
@@ -160,7 +159,7 @@ class FullDaysDataset(Dataset):
         return self.as_tf_dataset().element_spec
 
     @property
-    def feature_specs(self) -> Dict[str, tf.TensorSpec]:
+    def feature_specs(self) -> dict[str, tf.TensorSpec]:
         return self.element_spec[0]
 
     @property
@@ -168,14 +167,14 @@ class FullDaysDataset(Dataset):
         return {name: tuple(spec.shape.as_list()) for (name, spec) in self.feature_specs.items()}
 
     @property
-    def target_specs(self) -> Dict[str, tf.TensorSpec]:
+    def target_specs(self) -> dict[str, tf.TensorSpec]:
         return self.element_spec[1]
 
     @property
     def target_shapes(self):
         return {name: tuple(spec.shape.as_list()) for (name, spec) in self.target_specs.items()}
 
-    def get_targets(self, scaling: bool = True) -> Dict[str, np.ndarray]:
+    def get_targets(self, scaling: bool = True) -> dict[str, np.ndarray]:
         """
         Returns a dictionary set of the target data as numpy arrays.
         Useful for working with the entire set of truth data.
@@ -188,7 +187,7 @@ class FullDaysDataset(Dataset):
             scaling (bool, optional): Whether to scale the data according to the scale ranges. Defaults to True.
 
         Returns:
-            Dict[str, np.ndarray]: The dictionary containing the numpy arrays of target data.
+            dict[str, np.ndarray]: The dictionary containing the numpy arrays of target data.
         """
         identity_model = keras_utils.create_identity_model(self.target_shapes)
         # create the targets-only dataset (ensure quick loading with prefetch and parallel calls)
@@ -204,7 +203,7 @@ class FullDaysDataset(Dataset):
         return {self._target_names[i]: v for i, v in enumerate(pred_dict.values())}
 
     @property
-    def days(self) -> List[str]:
+    def days(self) -> list[str]:
         return self._days
 
     @property
@@ -216,7 +215,7 @@ class FullDaysDataset(Dataset):
         return self._source
 
     @property
-    def profile(self) -> Dict[str, Any]:
+    def profile(self) -> dict[str, Any]:
         return {
             "days": self.days,
             "data_path": self._data_path.name,
@@ -261,7 +260,7 @@ class FullDaysDataset(Dataset):
         hash_obj = hashlib.sha256(final_str.encode())
         return hash_obj.hexdigest()[0:8]
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         """
         Create config dictionary for the dataset.
 
@@ -285,14 +284,14 @@ class FullDaysDataset(Dataset):
         """
         mlflow.log_input(self, context)
 
-    def get_input_layers(self) -> Dict[str, Any]:
+    def get_input_layers(self) -> dict[str, Any]:
         """
         Returns a dictionary of input layers for building Keras models based on the list
         features in this dataset.
         """
-        return {name: Input(shape, name=name) for name, shape in self.feature_shapes.items()}
+        return {name: keras.Input(shape, name=name) for name, shape in self.feature_shapes.items()}
 
-    def get_output_layers(self, activation="linear") -> Dict[str, Dense]:
+    def get_output_layers(self, activation="linear") -> dict[str, keras.layers.Dense]:
         """
         Returns a dictionary of input layers for building Keras models based on the list
         features in this dataset.
@@ -305,11 +304,11 @@ class FullDaysDataset(Dataset):
             else:
                 units = shape[0]
 
-            output_layers[name] = Dense(units, activation=activation, name=name)
+            output_layers[name] = keras.layers.Dense(units, activation=activation, name=name)
 
         return output_layers
 
-    def create_unscale_model(self, model: Model) -> Model:
+    def create_unscale_model(self, model: keras.Model) -> keras.Model:
         """
         Creates a new model that automatically unscales the output (if applicable).
         Useful for metric evaluation so that unscaling is automatic.
@@ -336,20 +335,20 @@ class FullDaysDataset(Dataset):
 
             return outs
 
-        unscale = Lambda(unscaler, name="Unscaler")(model_out)
-        outs = [Lambda(lambda x: x, name=name)(unscale[i]) for (i, name) in enumerate(self._target_names)]
+        unscale = keras.layers.Lambda(unscaler, name="Unscaler")(model_out)
+        outs = [keras.layers.Lambda(lambda x: x, name=name)(unscale[i]) for (i, name) in enumerate(self._target_names)]
 
-        return Model(inp, outs)
+        return keras.Model(inp, outs)
 
     def evaluate(
         self,
-        model: Model,
-        metrics: List[Any],
+        model: keras.Model,
+        metrics: list[Any],
         context: str,
         batch_size: int = 1024,
         unscale: bool = False,
         log: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Evalutes using a model with inputs and outputs that match the features and targets of
         this dataset. Optionally unscales the targets to get unscaled evaluations.
@@ -371,7 +370,7 @@ class FullDaysDataset(Dataset):
 
         return eval_dict
 
-    def predict(self, model: Model, batch_size: int = 1024, unscale: bool = False) -> Dict[str, np.ndarray]:
+    def predict(self, model: keras.Model, batch_size: int = 1024, unscale: bool = False) -> dict[str, np.ndarray]:
         """
         Predicts using a model with inputs and outputs that match the features and targets of
         this dataset.
@@ -389,15 +388,15 @@ class FullDaysDataset(Dataset):
 
 def get_split_datasets(
     data_path: DPath,
-    feature_names: List[DKey],
-    target_names: List[DKey],
-    train_days: List[str],
-    validation_days: List[str],
-    test_days: List[str],
-    scale_ranges: Dict[DKey, Tuple[Any, Any]] | None = None,
-    filters: Dict[DKey, List[Tuple[Any, Any]]] | None = None,
+    feature_names: list[DKey],
+    target_names: list[DKey],
+    train_days: list[str],
+    validation_days: list[str],
+    test_days: list[str],
+    scale_ranges: dict[DKey, tuple[Any, Any]] | None = None,
+    filters: dict[DKey, list[tuple[Any, Any]]] | None = None,
     autolog: bool = False,
-) -> Tuple[FullDaysDataset, FullDaysDataset, FullDaysDataset]:
+) -> tuple[FullDaysDataset, FullDaysDataset, FullDaysDataset]:
     """
     Gets data from a set of three FullDaysDataset and returns a tuple in the form of (train, validation, test)
     """
@@ -414,7 +413,7 @@ def get_split_datasets(
     return (train, validation, test)
 
 
-def get_datasets_from_run(run_id: str) -> Dict[str, FullDaysDataset]:
+def get_datasets_from_run(run_id: str) -> dict[str, FullDaysDataset]:
     """
     Given a mlflow run, parses the datasets and creates a dictionary with a key
     as the context tag of the dataset and the values as the fully parsed FullDaysDataset

@@ -1,4 +1,3 @@
-from typing import List
 from enum import Enum, auto
 import math
 
@@ -63,11 +62,11 @@ class FullDaysLoader:
     A base class for loading days worth of data initialized with a given number of days in the YYYYMMDD format.
     """
 
-    def __init__(self, days: List[str], data_path: DPath) -> None:
+    def __init__(self, days: list[str], data_path: DPath) -> None:
         """Initialize a loader with a list of days
 
         Args:
-            days (List[str]): the list of days to read from (format: YYYYMMDD)
+            days (list[str]): the list of days to read from (format: YYYYMMDD)
         """
         self.days = days
         self.dpath = data_path

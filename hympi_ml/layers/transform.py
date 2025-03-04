@@ -2,16 +2,13 @@
 A module for working with transformation / preprocessing model
 layers (normalization, min max scaling, etc).
 """
-
-from typing import Optional
-
 import numpy as np
-from keras.layers import Normalization
+import keras
 
 from hympi_ml.data.memmap import MemmapSequence
 
 
-def adapt_normalization(data: np.ndarray | MemmapSequence, random_samples: Optional[int]) -> Normalization:
+def adapt_normalization(data: np.ndarray | MemmapSequence, random_samples: int | None) -> keras.layers.Normalization:
     """
     Creates a keras normalization layer adapted from the given data sequence. Define a number of random
     samples to pull a random subset of the input data.
@@ -24,10 +21,10 @@ def adapt_normalization(data: np.ndarray | MemmapSequence, random_samples: Optio
     mean = data.mean(axis=0)
     variance = data.var(axis=0)
 
-    return Normalization(mean=mean, variance=variance)
+    return keras.layers.Normalization(mean=mean, variance=variance)
 
 
-def adapt_minmax(data: np.ndarray | MemmapSequence, random_samples: Optional[int]) -> Normalization:
+def adapt_minmax(data: np.ndarray | MemmapSequence, random_samples: int | None) -> keras.layers.Normalization:
     """
     Creates a keras normalization layer adapted from the given data sequence. Define a number of random
     samples to pull a random subset of the input data if the data is too large.
@@ -46,7 +43,7 @@ def adapt_minmax(data: np.ndarray | MemmapSequence, random_samples: Optional[int
     return create_minmax(mins, maxs)
 
 
-def create_minmax(min: np.ndarray | float, max: np.ndarray | float) -> Normalization:
+def create_minmax(min: np.ndarray | float, max: np.ndarray | float) -> keras.layers.Normalization:
     """
     Uses a Keras normalization with specially calculated mean and variance that allows the layer
     to work the same way as a custom minmax layer without resorting to a custom keras layers.
@@ -58,4 +55,4 @@ def create_minmax(min: np.ndarray | float, max: np.ndarray | float) -> Normaliza
     Returns:
         Normalization: A normalization layer with the correctly calculated mean and variance to simulate a min max scaling layer
     """
-    return Normalization(mean=min, variance=np.square(max - min))
+    return keras.layers.Normalization(mean=min, variance=np.square(max - min))
