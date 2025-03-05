@@ -1,3 +1,4 @@
+import sys; sys.path.insert(0, '..') # add parent folder path where lib folder is
 import gc
 
 import mlflow
@@ -12,6 +13,9 @@ from hympi_ml.evaluation import figs
 from hympi_ml.utils.gpu import set_gpus
 
 target_names = [DKey.PBLH]
+
+from rich import traceback
+traceback.install()
 
 
 def start_run(feature_names: list[DKey], add_nedt: bool):
@@ -98,8 +102,8 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
 
         model.compile(
             optimizer=optimizers.Adam(learning_rate=0.001, amsgrad=True),
-            loss=losses.MAE,
-            metrics=[metrics.MAE],
+            loss=losses.MeanAbsoluteError(),
+            metrics=[metrics.MeanAbsoluteError()],
         )
         model.summary()
 
@@ -108,7 +112,7 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
         mlflow.log_param("data_batch_size", batch_size)
 
         train_ds = (
-            train.as_tf_dataset()
+            train.as_tf_dataset(as_list=True)
             .cache()
             .shuffle(buffer_size=2**18, reshuffle_each_iteration=True)
             .batch(batch_size)
@@ -120,7 +124,7 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
         model.fit(
             train_ds,
             validation_data=val_ds,
-            epochs=1000,
+            epochs=1,
             verbose=1,
             callbacks=[
                 callbacks.EarlyStopping(monitor="val_loss", patience=8, verbose=1),
@@ -134,11 +138,11 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
 
 
 with mlflow_log.start_run(
-    tracking_uri="/data/nature_run/hympi-ml-retrieval/mlruns",
+    tracking_uri="/home/dgershm1/mlruns",
     experiment_name="+".join([key.name for key in target_names]),
     log_datasets=False,
 ):
-    # start_run(feature_names=[DKey.ATMS], add_nedt=True)
+    start_run(feature_names=[DKey.ATMS], add_nedt=True)
     # start_run(feature_names=[DKey.ATMS, DKey.CPL], add_nedt=True)
-    start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW], add_nedt=True)
-    start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW, DKey.CPL], add_nedt=True)
+    # start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW], add_nedt=True)
+    # start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW, DKey.CPL], add_nedt=True)
