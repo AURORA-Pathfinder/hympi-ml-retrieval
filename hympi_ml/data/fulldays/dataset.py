@@ -120,7 +120,7 @@ class FullDaysDataset(Dataset):
 
         return dataset.map(split, num_parallel_calls=tf.data.AUTOTUNE)
 
-    def as_tf_dataset(self, scale_targets: bool = True, keys: list[DKey] | None = None) -> tf.data.Dataset:
+    def as_tf_dataset(self, scale_targets: bool = True, keys: list[DKey] | None = None, as_list: bool = False) -> tf.data.Dataset:
         """
         Generates a TensorFlow Dataset for the features and targets in this FullDaysDataset.
         By default, the dataset has elements in the form of a tuple containing (features, targets) as dictionaries.
@@ -140,7 +140,7 @@ class FullDaysDataset(Dataset):
         if keys is not None:
             names += keys
 
-        data_dict = {key: self.loader.get_tf_dataset(key) for key in names}
+        data_dict = {str(key): self.loader.get_tf_dataset(key) for key in names}
         ds = tf.data.Dataset.zip(data_dict)
 
         ds = self._apply_filters(ds)
@@ -151,6 +151,9 @@ class FullDaysDataset(Dataset):
             ds = ds.map(lambda d: {k: v for k, v in d.items() if k in keys})
         else:
             ds = self._split_features_targets(ds)
+            
+        if as_list:
+            ds = ds.map(lambda f, t: (tuple(f.values()), tuple(t.values())))
 
         return ds
 
