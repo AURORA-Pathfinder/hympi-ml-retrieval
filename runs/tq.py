@@ -1,3 +1,4 @@
+import sys; sys.path.insert(0, '..') # add parent folder path where lib folder is
 import gc
 
 import mlflow
@@ -10,6 +11,9 @@ from hympi_ml.data.fulldays import DKey, DPath, get_split_datasets
 from hympi_ml.layers import mlp, noise
 from hympi_ml.evaluation import figs
 from hympi_ml.utils.gpu import set_gpus
+
+from rich import traceback
+traceback.install()
 
 target_names = [DKey.TEMPERATURE, DKey.WATER_VAPOR]
 
@@ -66,10 +70,8 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
             out = layers.LayerNormalization()(out)
 
             if size > 32:
-                out = layers.Dense(size / 2, activation)(out)
-                out = layers.Dense(size / 4, activation)(out)
-                out = layers.Dense(size / 8, activation)(out)
-
+                # out = layers.Dense(int(size / 4), activation)(out)
+                out = layers.Dense(int(size / 8), activation)(out)
 
             output_layers.append(out)
 
@@ -93,17 +95,17 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
         for target in target_names:
             output_layers[target] = output_layers[target](dense_layers)
 
-        model = keras.Model(list(input_layers.values()), list(output_layers.values()))
+        model = keras.Model(input_layers, output_layers)
 
         model.compile(
             optimizer=optimizers.Adam(learning_rate=0.001, amsgrad=True),
-            loss=losses.MAE,
-            metrics=[metrics.MAE],
+            loss=losses.MeanAbsoluteError(),
+            metrics=[metrics.MeanAbsoluteError(), metrics.MeanAbsoluteError()],
         )
         model.summary()
 
         # Training
-        batch_size = 512
+        batch_size = 1024
         mlflow.log_param("data_batch_size", batch_size)
 
         train_ds = (
@@ -119,7 +121,7 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
         model.fit(
             train_ds,
             validation_data=val_ds,
-            epochs=1000,
+            epochs=2,
             verbose=1,
             callbacks=[
                 callbacks.EarlyStopping(monitor="val_loss", patience=8, verbose=1, min_delta=0.0001),
@@ -142,12 +144,12 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
 
 
 with mlflow_log.start_run(
-    tracking_uri="/data/nature_run/hympi-ml-retrieval/mlruns",
+    tracking_uri="/home/dgershm1/mlruns",
     experiment_name="+".join([key.name for key in target_names]),
     log_datasets=False,
 ):
-    start_run(feature_names=[DKey.ATMS], add_nedt=True)
+    # start_run(feature_names=[DKey.ATMS], add_nedt=True)
     # start_run(feature_names=[DKey.ATMS, DKey.CPL], add_nedt=False)
     # start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW], add_nedt=True)
-    # start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW, DKey.CPL], add_nedt=True)
+    start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW, DKey.CPL], add_nedt=True)
     # start_run(feature_names=[DKey.CPL], add_nedt=True)
