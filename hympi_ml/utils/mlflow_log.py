@@ -53,7 +53,7 @@ def get_autolog_model(run_id: str) -> keras.Model:
     Returns:
         keras.Model: The loaded Keras model.
     """
-    return get_model(run_id, "model/data/model")
+    return get_model(run_id, "model/data/model.keras")
 
 
 def get_model(run_id: str, local_artifact_path: str) -> keras.Model:

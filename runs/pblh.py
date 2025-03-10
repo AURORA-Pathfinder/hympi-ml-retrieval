@@ -28,14 +28,14 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
             data_path=DPath.CPL_06,
             train_days=[
                 "20060315",
-                "20060515",
-                "20060615",
-                "20060715",
-                "20060915",
-                "20061015",
-                "20061115",
-                "20061215",
-                "20060815",
+                # "20060515",
+                # "20060615",
+                # "20060715",
+                # "20060915",
+                # "20061015",
+                # "20061115",
+                # "20061215",
+                # "20060815",
             ],
             validation_days=["20060803"],
             test_days=["20060803"],
@@ -72,9 +72,8 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
             out = layers.LayerNormalization()(out)
 
             if size > 32:
-                # out = layers.Dense(size / 2, activation)(out)
-                out = layers.Dense(size / 4, activation)(out)
-                out = layers.Dense(size / 8, activation)(out)
+                out = layers.Dense(int(size / 4), activation)(out)
+                out = layers.Dense(int(size / 8), activation)(out)
 
             output_layers.append(out)
 
@@ -98,7 +97,7 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
         for target in target_names:
             output_layers[target] = output_layers[target](dense_layers)
 
-        model = keras.Model(list(input_layers.values()), list(output_layers.values()))
+        model = keras.Model(input_layers, output_layers)
 
         model.compile(
             optimizer=optimizers.Adam(learning_rate=0.001, amsgrad=True),
@@ -108,11 +107,11 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
         model.summary()
 
         # Training
-        batch_size = 512
+        batch_size = 2048
         mlflow.log_param("data_batch_size", batch_size)
 
         train_ds = (
-            train.as_tf_dataset(as_list=True)
+            train.as_tf_dataset()
             .cache()
             .shuffle(buffer_size=2**18, reshuffle_each_iteration=True)
             .batch(batch_size)
@@ -142,7 +141,7 @@ with mlflow_log.start_run(
     experiment_name="+".join([key.name for key in target_names]),
     log_datasets=False,
 ):
-    start_run(feature_names=[DKey.ATMS], add_nedt=True)
+    # start_run(feature_names=[DKey.ATMS], add_nedt=True)
     # start_run(feature_names=[DKey.ATMS, DKey.CPL], add_nedt=True)
     # start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW], add_nedt=True)
-    # start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW, DKey.CPL], add_nedt=True)
+    start_run(feature_names=[DKey.HA, DKey.HD, DKey.HW, DKey.CPL], add_nedt=True)

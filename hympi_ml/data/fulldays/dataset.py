@@ -120,7 +120,7 @@ class FullDaysDataset(Dataset):
 
         return dataset.map(split, num_parallel_calls=tf.data.AUTOTUNE)
 
-    def as_tf_dataset(self, scale_targets: bool = True, keys: list[DKey] | None = None, as_list: bool = False) -> tf.data.Dataset:
+    def as_tf_dataset(self, scale_targets: bool = True, keys: list[DKey] | None = None) -> tf.data.Dataset:
         """
         Generates a TensorFlow Dataset for the features and targets in this FullDaysDataset.
         By default, the dataset has elements in the form of a tuple containing (features, targets) as dictionaries.
@@ -151,9 +151,6 @@ class FullDaysDataset(Dataset):
             ds = ds.map(lambda d: {k: v for k, v in d.items() if k in keys})
         else:
             ds = self._split_features_targets(ds)
-            
-        if as_list:
-            ds = ds.map(lambda f, t: (tuple(f.values()), tuple(t.values())))
 
         return ds
 
@@ -323,25 +320,19 @@ class FullDaysDataset(Dataset):
         Returns:
             Model: A new model with the same inputs but outputs unscaled targets (if applicable).
         """
-        inp = model.inputs
-        model_out = model(inp)
+        inputs = {i.name : i for i in model.inputs}
+        model_out = model(inputs)
+        
+        def unscale(out, name):
+            if self.scale_ranges is not None and name in self.scale_ranges:
+                minimum, maximum = self.scale_ranges[name]
+                return out * (maximum - minimum) + minimum
 
-        def unscaler(outs):
-            if not isinstance(outs, list):
-                outs = [outs]
+            return out
 
-            for i in range(len(outs)):
-                name = self._target_names[i]
-                if self.scale_ranges is not None and name in self.scale_ranges:
-                    minimum, maximum = self.scale_ranges[name]
-                    outs[i] = outs[i] * (maximum - minimum) + minimum
+        outputs = {name : keras.layers.Lambda(lambda x: unscale(x, name), name=name)(model_out[name]) for name in self._target_names}
 
-            return outs
-
-        unscale = keras.layers.Lambda(unscaler, name="Unscaler")(model_out)
-        outs = [keras.layers.Lambda(lambda x: x, name=name)(unscale[i]) for (i, name) in enumerate(self._target_names)]
-
-        return keras.Model(inp, outs)
+        return keras.Model(inputs, outputs)
 
     def evaluate(
         self,
@@ -356,12 +347,12 @@ class FullDaysDataset(Dataset):
         Evalutes using a model with inputs and outputs that match the features and targets of
         this dataset. Optionally unscales the targets to get unscaled evaluations.
         """
-        ds = self.as_tf_dataset()
-
         if unscale:
             model = self.create_unscale_model(model)
-            model.compile(metrics=metrics)
+            model.compile(optimizer=model.optimizer, metrics=metrics, loss=model.loss)
             ds = self.as_tf_dataset(scale_targets=False)
+        else:
+            ds = self.as_tf_dataset(scale_targets=True)
 
         ds = ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
@@ -385,8 +376,14 @@ class FullDaysDataset(Dataset):
 
         if unscale:
             model = self.create_unscale_model(model)
+            
+        preds = model.predict(ds)
 
-        return keras_utils.predict_dict(model, ds)
+        for k, v in preds.items():
+            if v.shape[1] == 1:
+                preds[k] = v.flatten()
+        
+        return preds
 
 
 def get_split_datasets(

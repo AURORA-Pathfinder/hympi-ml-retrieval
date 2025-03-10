@@ -1,4 +1,5 @@
 from enum import Enum, auto
+from enum import StrEnum
 import math
 
 import numpy as np
@@ -7,7 +8,7 @@ import tensorflow as tf
 from hympi_ml.data.memmap import MemmapSequence
 
 
-class DKey(str, Enum):
+class DKey(StrEnum):
     """
     An Enum that contains the list of datasets that could be loaded.
     """
@@ -50,7 +51,7 @@ class DPath(Enum):
     ALL_06 = "/data/nature_run/fulldays"
     "The entire 2006 dataset."
 
-    CPL_06 = "/data/nature_run/fulldays_cpl"
+    CPL_06 = "/explore/nobackup/people/jacaraba/projects/PBL_Fusion/fulldays_cpl"
     "A subset of ALL_06 with CPL_Flag = 1."
 
     CPL_06_REDUCED = "/data/nature_run/fulldays_reduced"
@@ -99,12 +100,12 @@ class FullDaysLoader:
             tf.data.Dataset: The generated dataset.
         """
         data = self.get_data(key)
-
+        
         shape = (load_batch_size,) + data.data_shape
 
         if shape == (load_batch_size, 1):
             shape = (load_batch_size,)
-
+            
         batches = math.floor(len(data) / load_batch_size)
 
         def gen():
