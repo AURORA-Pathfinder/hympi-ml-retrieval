@@ -66,7 +66,7 @@ def get_model(run_id: str, local_artifact_path: str) -> keras.Model:
     Returns:
         keras.Model: The loaded Keras model.
     """
-    artifacts_uri = get_artifacts_uri(run_id)
+    artifacts_uri = get_artifacts_uri(run_id)[7:]
     model_path = f"{artifacts_uri}/{local_artifact_path}"
     return keras.models.load_model(model_path)
 

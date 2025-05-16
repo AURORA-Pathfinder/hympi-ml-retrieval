@@ -2,13 +2,16 @@
 A module for working with transformation / preprocessing model
 layers (normalization, min max scaling, etc).
 """
+
 import numpy as np
 import keras
 
 from hympi_ml.data.memmap import MemmapSequence
 
 
-def adapt_normalization(data: np.ndarray | MemmapSequence, random_samples: int | None) -> keras.layers.Normalization:
+def adapt_normalization(
+    data: np.ndarray | MemmapSequence, random_samples: int | None
+) -> keras.layers.Normalization:
     """
     Creates a keras normalization layer adapted from the given data sequence. Define a number of random
     samples to pull a random subset of the input data.
@@ -24,7 +27,9 @@ def adapt_normalization(data: np.ndarray | MemmapSequence, random_samples: int |
     return keras.layers.Normalization(mean=mean, variance=variance)
 
 
-def adapt_minmax(data: np.ndarray | MemmapSequence, random_samples: int | None) -> keras.layers.Normalization:
+def adapt_minmax(
+    data: np.ndarray | MemmapSequence, random_samples: int | None
+) -> keras.layers.Normalization:
     """
     Creates a keras normalization layer adapted from the given data sequence. Define a number of random
     samples to pull a random subset of the input data if the data is too large.
@@ -43,7 +48,9 @@ def adapt_minmax(data: np.ndarray | MemmapSequence, random_samples: int | None) 
     return create_minmax(mins, maxs)
 
 
-def create_minmax(min: np.ndarray | float, max: np.ndarray | float) -> keras.layers.Normalization:
+def create_minmax(
+    min: np.ndarray | float, max: np.ndarray | float
+) -> keras.layers.Normalization:
     """
     Uses a Keras normalization with specially calculated mean and variance that allows the layer
     to work the same way as a custom minmax layer without resorting to a custom keras layers.
