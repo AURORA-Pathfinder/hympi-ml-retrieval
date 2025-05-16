@@ -1,6 +1,7 @@
 import collections.abc
 
 import numpy as np
+# import tensorflow as tf
 
 
 class MemmapSequence(collections.abc.Sequence):
@@ -13,11 +14,9 @@ class MemmapSequence(collections.abc.Sequence):
 
     def __init__(self, memmaps: list[np.memmap]):
         ref_shape = memmaps[0].shape[1:]
-        for m in memmaps:
-            if m.shape[1:] != ref_shape:
-                raise Exception(
-                    f"A memmap has the wrong shape! Expected {ref_shape}, but received {m.shape[1:]} from {m.filename}."
-                )
+
+        if not all(mm.shape[1:] == ref_shape for mm in memmaps):
+            raise Exception(f"A memmap has the wrong shape! Expected {ref_shape} but a file did not match!")
 
         self.memmaps = memmaps
 
@@ -118,3 +117,36 @@ class MemmapSequence(collections.abc.Sequence):
         Note: This may take a while if this sequence lots of data. Use wisely.
         """
         return np.concatenate(self.memmaps)
+
+    # def to_tf_dataset(self, dtype: tf.DType = tf.float64, load_batch_size: int = 1024) -> tf.data.Dataset:
+    #     """
+    #     Creates a tensorflow.data.Dataset from this MemmapSequence.
+
+    #     Args:
+    #         load_batch_size (int, optional): The size of the batches used for loading, the data does not come batched
+    #             Defaults to 1024.
+
+    #     Returns:
+    #         tf.data.Dataset: The generated dataset.
+    #     """
+    #     shape = (load_batch_size,) + self.data_shape
+
+    #     if shape == (load_batch_size, 1):
+    #         shape = (load_batch_size,)
+
+    #     batches = math.floor(len(self) / load_batch_size)
+
+    #     def gen():
+    #         for i in range(batches):
+    #             start = i * load_batch_size
+    #             stop = start + load_batch_size
+    #             yield self[start:stop]
+
+    #     return (
+    #         tf.data.Dataset.from_generator(
+    #             generator=gen,
+    #             output_signature=tf.TensorSpec(shape=shape, dtype=dtype),
+    #         )
+    #         .unbatch()
+    #         .apply(tf.data.experimental.assert_cardinality(batches * load_batch_size))
+    #     )

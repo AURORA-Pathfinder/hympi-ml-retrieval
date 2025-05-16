@@ -76,7 +76,12 @@ class PerBandNoise(keras.Layer):
         seed = tf.cast(tf.reshape(inputs, [-1])[:2], tf.int32)
 
         nedt = tf.convert_to_tensor(self.nedt)
-        noise = tf.stack([tf.random.stateless_normal(shape=(), stddev=n, seed=seed) for n in tf.unstack(nedt)])
+        noise = tf.stack(
+            [
+                tf.random.stateless_normal(shape=(), stddev=n, seed=seed)
+                for n in tf.unstack(nedt)
+            ]
+        )
 
         return tf.add(inputs, noise)
 

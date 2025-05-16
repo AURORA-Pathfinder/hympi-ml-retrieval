@@ -1,5 +1,3 @@
-from typing import Optional
-
 import numpy as np
 from netCDF4 import Dataset
 import keras
@@ -17,10 +15,10 @@ def generate_netcdf(
     model: keras.Model,
     train: FullDaysDataset,
     test: FullDaysDataset,
-    validation: Optional[FullDaysDataset],
+    validation: FullDaysDataset | None,
     cloud_fraction: float,
     name_prefix: str,
-    path: str = "/data/nature_run/nc",
+    dir_path: str,
 ):
     """
     Generates a NetCDF file represnting the prediction for a single day worth of data.
@@ -33,7 +31,7 @@ def generate_netcdf(
         validation (FullDaysDataset): The validation dataset for metadata
         cloud_fraction (float): The cloud fraciton of the train, test, and validation datasets
         name_prefix (str): The prefix applied to the output file name
-        path (str): The path where the netcdf file will be generated. Defaults to "/data/nature_run/nc".
+        dir_path (str): The path to the directory where the netcdf file will be placed.
     """
 
     train_days = train.days
@@ -50,7 +48,7 @@ def generate_netcdf(
     feature_names = "+".join(list(day_dataset.feature_specs.keys()))
     target_names = "+".join(list(day_dataset.target_shapes.keys()))
 
-    file_path = f"{path}/{name_prefix}_{day_context}_{day}_{feature_names}=={target_names}.nc"
+    file_path = f"{dir_path}/{name_prefix}_{day_context}_{day}_{feature_names}=={target_names}.nc"
 
     with Dataset(file_path, "w") as nc:
         nc.title = "Truth vs. Predicted Profiles"
@@ -94,7 +92,9 @@ def generate_netcdf(
 
         lat_lon_spress = np.array(
             list(
-                day_dataset.as_tf_dataset(keys=[DKey.LATITUDE, DKey.LONGITUDE, DKey.SURFACE_PRESSURE])
+                day_dataset.as_tf_dataset(
+                    keys=[DKey.LATITUDE, DKey.LONGITUDE, DKey.SURFACE_PRESSURE]
+                )
                 .map(lambda x: list(x.values()))
                 .as_numpy_iterator()
             )
@@ -105,7 +105,9 @@ def generate_netcdf(
         spr[:] = lat_lon_spress[:, 2]
 
 
-def generate_netcdf_from_run(run_id: str, day: str, name_prefix: str | None = None):
+def generate_netcdf_from_run(
+    run_id: str, day: str, dir_path: str, name_prefix: str | None = None
+):
     loaded_model = mlflow_log.get_autolog_model(run_id)
 
     datasets = get_datasets_from_run(run_id)
@@ -136,4 +138,5 @@ def generate_netcdf_from_run(run_id: str, day: str, name_prefix: str | None = No
         validation=validation,
         cloud_fraction=cloud_fraction,
         name_prefix=pre,
+        dir_path=dir_path,
     )

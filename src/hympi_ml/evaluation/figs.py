@@ -1,4 +1,3 @@
-from typing import Dict, List, Optional
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -8,7 +7,7 @@ from matplotlib.ticker import PercentFormatter
 import keras
 
 from hympi_ml.data.fulldays import units, DKey
-from hympi_ml.data.fulldays.dataset import FullDaysDataset, get_datasets_from_run
+from hympi_ml.data.model_dataset import ModelDataset, get_datasets_from_run
 import hympi_ml.utils.mlflow_log as mlflow_log
 
 
@@ -22,7 +21,9 @@ class EvalFigure(ABC):
         pass
 
     @abstractmethod
-    def get_figure(self, pred: np.ndarray, truth: np.ndarray, data_name: str, context: str) -> Figure:
+    def get_figure(
+        self, pred: np.ndarray, truth: np.ndarray, data_name: str, context: str
+    ) -> Figure:
         """
         Takes a set of predictions and truth values and some other data to generate a figure.
 
@@ -43,7 +44,9 @@ class MeanErrorHistogram(EvalFigure):
     def title(self) -> str:
         return "Mean Error Histogram"
 
-    def get_figure(self, preds: np.ndarray, truths: np.ndarray, data_name: str, context: str) -> Figure:
+    def get_figure(
+        self, preds: np.ndarray, truths: np.ndarray, data_name: str, context: str
+    ) -> Figure:
         fig = plt.figure()
 
         mean_error = preds - truths
@@ -78,10 +81,14 @@ class MeanErrorHistogram(EvalFigure):
 
 class EvalProfile(EvalFigure, ABC):
     @abstractmethod
-    def get_profiles(self, pred: np.ndarray, truth: np.ndarray) -> Dict[str, np.ndarray]:
+    def get_profiles(
+        self, pred: np.ndarray, truth: np.ndarray
+    ) -> dict[str, np.ndarray]:
         pass
 
-    def get_figure(self, pred: np.ndarray, truth: np.ndarray, data_name: str, context: str) -> Figure:
+    def get_figure(
+        self, pred: np.ndarray, truth: np.ndarray, data_name: str, context: str
+    ) -> Figure:
         fig = plt.figure()
 
         profiles = self.get_profiles(pred, truth)
@@ -113,7 +120,9 @@ class MeanErrorProfile(EvalProfile):
 
         return title + " Error"
 
-    def get_profiles(self, pred: np.ndarray, truth: np.ndarray) -> Dict[str, np.ndarray]:
+    def get_profiles(
+        self, pred: np.ndarray, truth: np.ndarray
+    ) -> dict[str, np.ndarray]:
         profile = pred - truth
 
         if self.percentage:
@@ -125,7 +134,9 @@ class MeanErrorProfile(EvalProfile):
         profile = np.mean(profile, axis=0)
         return {self.title: profile}
 
-    def get_figure(self, pred: np.ndarray, truth: np.ndarray, data_name: str, context: str) -> Figure:
+    def get_figure(
+        self, pred: np.ndarray, truth: np.ndarray, data_name: str, context: str
+    ) -> Figure:
         super_fig = super().get_figure(pred, truth, data_name, context)
 
         if self.percentage:
@@ -139,14 +150,20 @@ class VarCompProfile(EvalProfile):
     def title(self) -> str:
         return "Pred v. Truth Variance"
 
-    def get_profiles(self, pred: np.ndarray, truth: np.ndarray) -> Dict[str, np.ndarray]:
+    def get_profiles(
+        self, pred: np.ndarray, truth: np.ndarray
+    ) -> dict[str, np.ndarray]:
         var_pred = np.var(pred, axis=0)
         var_truth = np.var(truth, axis=0)
 
         return {"Pred": var_pred, "Truth": var_truth}
 
 
-def plot_profiles(profiles: Dict[str, np.ndarray], value_axis: Optional[str] = None, levels_axis: str = "Levels"):
+def plot_profiles(
+    profiles: dict[str, np.ndarray],
+    value_axis: str | None = None,
+    levels_axis: str = "Levels",
+):
     """
     Given a dictionary of arrays that each represent a single profile, plots them into a common format used for
     profile figures. This includes a vertical, inverted x-axis with proper labels.
@@ -174,12 +191,12 @@ def plot_profiles(profiles: Dict[str, np.ndarray], value_axis: Optional[str] = N
 
 
 def plot_eval_figures(
-    preds: Dict[str, np.ndarray],
-    truths: Dict[str, np.ndarray],
-    eval_figures: List[EvalFigure],
+    preds: dict[str, np.ndarray],
+    truths: dict[str, np.ndarray],
+    eval_figures: list[EvalFigure],
     context: str,
     log: bool = False,
-) -> List[Figure]:
+) -> list[Figure]:
     """
     Creates figures from EvalFigures with provided dictionaries of predictions and truths.
 
@@ -206,7 +223,9 @@ def plot_eval_figures(
             fig = eval_figure.get_figure(preds[name], truths[name], name, context)
 
             if log:
-                mlflow_log.log_figure(fig, artifact_file=f"{context}_figures/{fig.get_suptitle()}.png")
+                mlflow_log.log_figure(
+                    fig, artifact_file=f"{context}_figures/{fig.get_suptitle()}.png"
+                )
 
             figs.append(fig)
 
@@ -215,10 +234,10 @@ def plot_eval_figures(
 
 def get_eval_figs(
     model: keras.Model,
-    datasets: Dict[str, FullDaysDataset],
-    eval_figures: List[EvalFigure],
+    datasets: dict[str, ModelDataset],
+    eval_figures: list[EvalFigure],
     log: bool = False,
-) -> List[Figure]:
+) -> list[Figure]:
     """
     Logs the useful evaluation profile plots for the train and test sets automatically.
 
@@ -226,8 +245,8 @@ def get_eval_figs(
 
     Args:
         model (Model): A Keras model to predict from
-        train (FullDaysDataset): The train dataset
-        test (FullDaysDataset): The test dataset
+        train (ModelDataset): The train dataset
+        test (ModelDataset): The test dataset
     """
     figs = []
 
@@ -241,7 +260,9 @@ def get_eval_figs(
     return figs
 
 
-def log_metric_profile_figs(run_id: str, eval_figures: List[EvalFigure]) -> List[Figure]:
+def log_metric_profile_figs(
+    run_id: str, eval_figures: list[EvalFigure]
+) -> list[Figure]:
     """Takes an MLFlow run_id and a set of evaluation figures and automatically loads the model data
     and the datasets to create all of the requested figures and log them into MLFlow.
 

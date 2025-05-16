@@ -1,4 +1,6 @@
-import sys; sys.path.insert(0, '..') # add parent folder path where lib folder is
+import sys
+
+sys.path.insert(0, "..")  # add parent folder path where lib folder is
 import gc
 
 import mlflow
@@ -15,6 +17,7 @@ from hympi_ml.utils.gpu import set_gpus
 target_names = [DKey.PBLH]
 
 from rich import traceback
+
 traceback.install()
 
 
@@ -132,8 +135,12 @@ def start_run(feature_names: list[DKey], add_nedt: bool):
         )
 
         # Evaluation
-        figs.log_metric_profile_figs(mlflow.active_run().info.run_id, [figs.MeanErrorHistogram()])
-        test.evaluate(model, metrics=["mae", "mse"], context="test", unscale=True, log=True)
+        figs.log_metric_profile_figs(
+            mlflow.active_run().info.run_id, [figs.MeanErrorHistogram()]
+        )
+        test.evaluate(
+            model, metrics=["mae", "mse"], context="test", unscale=True, log=True
+        )
 
 
 with mlflow_log.start_run(
