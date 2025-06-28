@@ -9,7 +9,9 @@ from mlflow.tracking._tracking_service.client import TrackingServiceClient
 from matplotlib.figure import Figure
 
 
-def start_run(tracking_uri: str, experiment_name: str, **autolog_args) -> mlflow.ActiveRun:
+def start_run(
+    tracking_uri: str, experiment_name: str, **autolog_args
+) -> mlflow.ActiveRun:
     """
     Starts a new mlflow run with a given experiment name and returns the ActiveRun.
 

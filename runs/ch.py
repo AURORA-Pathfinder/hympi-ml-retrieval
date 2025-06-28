@@ -5,6 +5,8 @@ os.environ["KERAS_BACKEND"] = "torch"
 import gc
 from typing import Mapping
 
+import torch
+
 import mlflow
 import keras
 from keras import losses, metrics, callbacks, optimizers, layers
@@ -12,7 +14,7 @@ from keras import losses, metrics, callbacks, optimizers, layers
 from torch.utils.data import DataLoader
 
 from hympi_ml.utils import mlflow_log
-from hympi_ml.data.model_dataset import get_split_datasets, get_datasets_from_run
+from hympi_ml.data.model_dataset import get_split_datasets
 
 from hympi_ml.data import (
     DataSpec,
@@ -25,7 +27,7 @@ from hympi_ml.data import (
 )
 from hympi_ml.data.cosmirh import C1_band, C4_band
 from hympi_ml.layers import mlp
-# from hympi_ml.evaluation import figs
+from hympi_ml.evaluation.metrics import MeanErrorProfile, VarianceErrorProfile
 
 from rich import traceback
 
@@ -67,8 +69,7 @@ def start_run(
             size = train.feature_shapes[name][0]
 
             if size > 32:
-                # out = layers.Dense(int(size / 4), activation)(out)
-                out = layers.Dense(int(size / 8), activation)(out)
+                out = layers.Dense(int(size / 4), activation)(out)
 
             outputs.append(out)
 
@@ -110,17 +111,18 @@ def start_run(
             train,
             batch_size=None,
             shuffle=True,
-            num_workers=10,
             pin_memory=True,
-            prefetch_factor=4,
-            persistent_workers=True,
+            num_workers=10,
+            prefetch_factor=8,
+            # persistent_workers=True,
         )
+
         val_ds = DataLoader(
             validation,
             batch_size=None,
             shuffle=True,
-            num_workers=10,
             pin_memory=True,
+            num_workers=10,
             prefetch_factor=4,
             persistent_workers=True,
         )
@@ -128,29 +130,34 @@ def start_run(
         model.fit(
             train_ds,
             validation_data=val_ds,
-            epochs=3,
+            epochs=8,
             verbose=1,
             callbacks=[
                 callbacks.EarlyStopping(
-                    monitor="val_loss", patience=6, verbose=1, min_delta=0.0001
+                    monitor="val_loss", patience=8, verbose=1, min_delta=0.0001
                 ),
                 callbacks.ReduceLROnPlateau(patience=2, factor=0.5, min_lr=1e-6),
             ],
         )
 
         # Evaluation
-        # figs.log_metric_profile_figs(
-        #     mlflow.active_run().info.run_id,
-        #     [
-        #         figs.MeanErrorProfile(absolute=False, percentage=False),
-        #         figs.MeanErrorProfile(absolute=True, percentage=False),
-        #         figs.MeanErrorProfile(absolute=False, percentage=True),
-        #         figs.MeanErrorProfile(absolute=True, percentage=True),
-        #         figs.VarCompProfile(),
-        #     ],
-        # )
         test.evaluate(
-            model, metrics=["mae", "mse"], context="test", unscale=True, log=True
+            model,
+            metrics={
+                "TEMPERATURE": [
+                    MeanErrorProfile(other_ops="absolute", percentage=False),
+                    MeanErrorProfile(other_ops="absolute", percentage=True),
+                    VarianceErrorProfile(),
+                ],
+                "WATER_VAPOR": [
+                    MeanErrorProfile(other_ops="absolute", percentage=False),
+                    MeanErrorProfile(other_ops="absolute", percentage=True),
+                    VarianceErrorProfile(),
+                ],
+            },
+            context="test",
+            unscale=True,
+            log=True,
         )
 
 
@@ -161,10 +168,10 @@ with mlflow_log.start_run(
 ):
     start_run(
         features={
-            "CH_4": CosmirhSpec(
+            "CH_16": CosmirhSpec(
                 frequencies=[
-                    RFBand(low=C1_band.low, high=58, resolution=2 ** (-6)),
-                    RFBand(low=C4_band.low, high=192, resolution=2 ** (-6)),
+                    RFBand(low=C1_band.low, high=58, resolution=2 ** (-4)),
+                    RFBand(low=C4_band.low, high=192, resolution=2 ** (-4)),
                 ],
                 ignore_frequencies=[  # problematic CRTM frequencies
                     56.96676875,
@@ -174,12 +181,16 @@ with mlflow_log.start_run(
                 ],
                 scale_range=(200, 300),
             ),
+            # "AMPR": AMPRSpec(),
         },
         targets={
-            "TEMPERATURE": NRSpec(dataset="TEMPERATURE", scale_range=(175.0, 325.0)),
-            "WATER_VAPOR": NRSpec(
-                dataset="WATER_VAPOR", scale_range=(1.11e-7, 3.08e-2)
+            "TEMPERATURE": NRSpec(
+                dataset="TEMPERATURE",
+                # scale_range=(175.0, 325.0),
             ),
+            # "WATER_VAPOR": NRSpec(
+            #     dataset="WATER_VAPOR", scale_range=(1.11e-7, 3.08e-2)
+            # ),
         },
         train_source=ch06.Ch06Source(
             days=[

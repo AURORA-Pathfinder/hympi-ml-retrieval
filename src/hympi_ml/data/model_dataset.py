@@ -18,7 +18,7 @@ from mlflow.data.schema import TensorDatasetSchema
 import keras
 
 from hympi_ml.data import DataSpec, DataSource
-from hympi_ml.utils import mlflow_log, keras_utils
+from hympi_ml.utils import mlflow_log
 
 
 class ModelDataset(mlflow.data.dataset.Dataset, torch.utils.data.Dataset):
@@ -89,9 +89,11 @@ class ModelDataset(mlflow.data.dataset.Dataset, torch.utils.data.Dataset):
             raw_batch = feature_spec.load_raw_slice(
                 source=self._data_source, start=start, end=end
             )
-            raw_batch = torch.from_numpy(np.array(raw_batch, copy=True))
-            batch = self.features[name].apply_batch(raw_batch)
-            features_batch[name] = batch
+            raw_batch = torch.from_numpy(
+                np.array(raw_batch, copy=True, dtype=np.float32)
+            )
+            # batch = self.features[name].apply_batch(raw_batch)
+            features_batch[name] = raw_batch
 
         targets_batch = {}
 
@@ -99,9 +101,11 @@ class ModelDataset(mlflow.data.dataset.Dataset, torch.utils.data.Dataset):
             raw_batch = target_spec.load_raw_slice(
                 source=self._data_source, start=start, end=end
             )
-            raw_batch = torch.from_numpy(np.array(raw_batch, copy=True))
-            batch = self.targets[name].apply_batch(raw_batch)
-            targets_batch[name] = batch
+            raw_batch = torch.from_numpy(
+                np.array(raw_batch, copy=True, dtype=np.float32)
+            )
+            # batch = self.targets[name].apply_batch(raw_batch)
+            targets_batch[name] = raw_batch
 
         return (features_batch, targets_batch)
 
@@ -123,40 +127,6 @@ class ModelDataset(mlflow.data.dataset.Dataset, torch.utils.data.Dataset):
     @property
     def target_shapes(self):
         return {k: v.shape for k, v in self.targets.items()}
-
-    def get_targets(self, scaling: bool = True) -> dict[str, np.ndarray]:
-        """
-        Returns a dictionary set of the target data as numpy arrays.
-        Useful for working with the entire set of truth data.
-
-        Note: This uses a Keras model to extract the data faster than simply converting the
-        tensorflow dataset to a ndarray. This results in using any selected GPUs which will use its
-        memory. Keep this in mind when running this for a large set of training data.
-
-        Args:
-            scaling (bool, optional): Whether to scale the data according to the scale ranges. Defaults to True.
-
-        Returns:
-            dict[str, np.ndarray]: The dictionary containing the numpy arrays of target data.
-        """
-        identity_model = keras_utils.create_identity_model(self.target_shapes)
-
-        if scaling:
-            ds = self
-        else:
-            ds = self.get_unscaled_copy()
-
-        ds = ModelDataset(
-            data_source=ds.data_source, features=ds.targets, targets=ds.targets
-        )
-
-        loader = torch.utils.data.DataLoader(
-            self, batch_size=None, shuffle=False, num_workers=10, pin_memory=True
-        )
-
-        pred_dict = keras_utils.predict_dict(identity_model, loader)
-
-        return {self.target_names[i]: v for i, v in enumerate(pred_dict.values())}
 
     @property
     def data_source(self) -> DataSource:
@@ -254,7 +224,9 @@ class ModelDataset(mlflow.data.dataset.Dataset, torch.utils.data.Dataset):
             new_target.scale_range = None
             unscaled_targets[name] = new_target
 
-        return ModelDataset(self.data_source, self.features, unscaled_targets)
+        return ModelDataset(
+            self.data_source, self.features, unscaled_targets, self.batch_size
+        )
 
     def create_unscale_model(self, model: keras.Model) -> keras.Model:
         """
@@ -293,7 +265,7 @@ class ModelDataset(mlflow.data.dataset.Dataset, torch.utils.data.Dataset):
     def evaluate(
         self,
         model: keras.Model,
-        metrics: list[Any],
+        metrics: dict[str, list[Any]],
         context: str,
         unscale: bool = False,
         log: bool = False,
@@ -304,9 +276,6 @@ class ModelDataset(mlflow.data.dataset.Dataset, torch.utils.data.Dataset):
         """
         if unscale:
             model = self.create_unscale_model(model)
-            model.compile(
-                metrics={name: metrics for name in self.target_names}, loss="mae"
-            )
             ds = self.get_unscaled_copy()
         else:
             ds = self
@@ -315,40 +284,27 @@ class ModelDataset(mlflow.data.dataset.Dataset, torch.utils.data.Dataset):
             ds, batch_size=None, shuffle=False, num_workers=10, pin_memory=True
         )
 
+        model.compile(metrics=metrics, loss="mae")
         eval_dict = model.evaluate(loader, return_dict=True)
         eval_dict = {
             f"{context}_{k}": v for k, v in eval_dict.items() if "loss" not in k
         }
 
         if log:
-            mlflow.log_metrics(eval_dict)
+            for k, v in eval_dict.items():
+                if "loss" in k:
+                    continue
+
+                if isinstance(v, float):
+                    mlflow.log_metric(key=k, value=v)
+                else:
+                    np.save(f"/tmp/{k}.npy", np.array(v.cpu()))
+                    mlflow.log_artifact(
+                        local_path=f"/tmp/{k}.npy",
+                        artifact_path=f"{context}_metrics",
+                    )
 
         return eval_dict
-
-    def predict(
-        self, model: keras.Model, unscale: bool = False
-    ) -> dict[str, np.ndarray]:
-        """
-        Predicts using a model with inputs and outputs that match the features and targets of
-        this dataset.
-
-        Note: This will predict on the ENTIRE dataset. This may take a while and use lots of memory.
-        Consider forcing CPU usage if GPU memory runs out of memory.
-        """
-        loader = torch.utils.data.DataLoader(
-            self, batch_size=None, shuffle=False, num_workers=10, pin_memory=True
-        )
-
-        if unscale:
-            model = self.create_unscale_model(model)
-
-        preds = model.predict(loader)
-
-        for k, v in preds.items():
-            if v.shape[1] == 1:
-                preds[k] = v.flatten()
-
-        return preds
 
 
 def get_split_datasets(

@@ -3,7 +3,7 @@ import collections.abc
 
 import torch
 import numpy as np
-from pydantic import BaseModel, ValidationError, ConfigDict, model_serializer
+from pydantic import BaseModel
 
 
 class NamedBaseModel(BaseModel):

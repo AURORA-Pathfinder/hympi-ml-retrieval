@@ -12,9 +12,9 @@ The path to the data CH06 dataset itself. This is used directly in Ch06Source lo
 
 
 class Ch06Source(
-    cosmirh.CosmirhSource, 
-    atms.ATMSSource, 
-    ampr.AMPRSource, 
+    cosmirh.CosmirhSource,
+    atms.ATMSSource,
+    ampr.AMPRSource,
     nature_run.NRSource,
 ):
     """
@@ -27,7 +27,7 @@ class Ch06Source(
     @property
     def data_dir(self) -> str:
         return CH06_PATH
-    
+
     @property
     def sample_count(self) -> int:
         return len(self.ampr)
@@ -41,28 +41,8 @@ class Ch06Source(
         return [np.load(f, mmap_mode="r") for f in files]
 
     @property
-    def c1(self) -> MemmapSequence:
-        return MemmapSequence(self._load_memmaps("C1"))
-    
-    @property
-    def c2(self) -> MemmapSequence:
-        return MemmapSequence(self._load_memmaps("C2"))
-    
-    @property
-    def c3(self) -> MemmapSequence:
-        return MemmapSequence(self._load_memmaps("C3"))
-    
-    @property
-    def c4(self) -> MemmapSequence:
-        return MemmapSequence(self._load_memmaps("C4"))
-    
-    @property
-    def c5(self) -> MemmapSequence:
-        return MemmapSequence(self._load_memmaps("C5"))
-    
-    @property
-    def c6(self) -> MemmapSequence:
-        return MemmapSequence(self._load_memmaps("C6"))
+    def ch(self) -> MemmapSequence:
+        return MemmapSequence(self._load_memmaps("CH"))
 
     @property
     def atms(self) -> MemmapSequence:
