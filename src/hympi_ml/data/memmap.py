@@ -16,7 +16,9 @@ class MemmapSequence(collections.abc.Sequence):
         ref_shape = memmaps[0].shape[1:]
 
         if not all(mm.shape[1:] == ref_shape for mm in memmaps):
-            raise Exception(f"A memmap has the wrong shape! Expected {ref_shape} but a file did not match!")
+            raise Exception(
+                f"A memmap has the wrong shape! Expected {ref_shape} but a file did not match!"
+            )
 
         self.memmaps = memmaps
 
@@ -83,6 +85,9 @@ class MemmapSequence(collections.abc.Sequence):
                 return slices[0]
             else:
                 return np.concatenate(slices)
+            # else:
+            # print(val)
+            # return None
 
         if isinstance(val, np.ndarray):
             samples = []

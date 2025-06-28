@@ -8,7 +8,8 @@ class RFBand(BaseModel):
     """A class that defines a band of radiofrequency (RF) at an optional resolution.
     This is meant to be paired with other data to define Radiometer specifications.
 
-    The units for all values are generally to be written in GHz.
+    Note that there is no checks for order of magnitude. Ensure that the RFBand you implement
+    are all using the same units (normally it's GHz for Hyperspectral data).
     """
 
     low: float
@@ -34,8 +35,6 @@ class RFBand(BaseModel):
 
         if self.resolution is None:
             return True
-
-        # return f in self.to_array()
 
         diff = round(f - self.low, self._order)
 
@@ -119,3 +118,17 @@ class RFBand(BaseModel):
                 high_index = i - 1
 
         return res_list[low_index:high_index]
+
+    def scale(self, factor: float):
+        """
+        Returns a new RFBand with the resolution scaled by the provided factor.
+
+        Raises:
+            ValueError: If no resolution is defined for this band.
+        """
+        if self.resolution is not None:
+            return RFBand(
+                low=self.low, high=self.high, resolution=self.resolution * factor
+            )
+
+        raise ValueError("Cannot scale RFBand with no resolution!")
