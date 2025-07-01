@@ -26,9 +26,9 @@ class NamedBaseModel(BaseModel):
         raise LookupError(f"No class found with name: {dump['class_name']}")
 
     def model_dump(self, *args, **kwargs):
-        original = super().model_dump(*args, **kwargs)
-        original["class_name"] = self.__class__.__name__
-        return original
+        dump = super().model_dump(*args, **kwargs)
+        dump["class_name"] = self.__class__.__name__
+        return dump
 
 
 class DataSource(NamedBaseModel, ABC):
@@ -68,7 +68,7 @@ class DataSpec(NamedBaseModel, ABC):
 
     def apply_batch(self, batch: torch.Tensor) -> torch.Tensor:
         """
-        Applies the data spec transformations to a single batch of data.
+        Applies the data spec transformations to a single batch of raw data.
         """
         if self.scale_range is not None:
             minimum = torch.from_numpy(np.array(self.scale_range[0], dtype=np.float64))
