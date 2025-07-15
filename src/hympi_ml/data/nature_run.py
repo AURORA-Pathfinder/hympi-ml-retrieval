@@ -42,7 +42,6 @@ class NRSpec(DataSpec):
                 return (2,)
             case "PBLH":
                 return (1,)
-
             case "PRESSURE" | "TEMPERATURE" | "WATER_VAPOR":
                 return (72,)
             case _:
@@ -55,7 +54,6 @@ class NRSpec(DataSpec):
                 return "Degrees"
             case "PBLH":
                 return "Height (m)"
-
             case "PRESSURE":
                 return "Presure (mb)"
             case "TEMPERATURE":

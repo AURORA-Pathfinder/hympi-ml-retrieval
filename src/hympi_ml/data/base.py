@@ -23,7 +23,9 @@ class NamedBaseModel(BaseModel):
                 except LookupError:  # hapens when the class name doesn't match
                     continue
 
-        raise LookupError(f"No class found with name: {dump['class_name']}")
+        raise LookupError(
+            f"Class '{dump['class_name']}' not found. You may need to import it."
+        )
 
     def model_dump(self, *args, **kwargs):
         dump = super().model_dump(*args, **kwargs)
@@ -76,3 +78,23 @@ class DataSpec(NamedBaseModel, ABC):
             return torch.div(torch.sub(batch, minimum), torch.sub(maximum, minimum))
 
         return batch
+
+    def get_filter_mask(self, batch: torch.Tensor) -> torch.Tensor:
+        """
+        Given a batch of data, creates a mask based on the filter_range for this spec.
+        Apply this mask or combine it with other masks to filter values for a batch of data.
+
+        NOTE: This mask is a one-dimensional vector for whether a single sample in a batch
+        matches the filter.
+        """
+        mask = torch.ones(size=batch.shape, device=batch.device) == 1
+
+        if self.filter_range is not None:
+            low, high = self.filter_range
+            mask &= (batch >= low) & (batch <= high)
+
+        # flattens multi-dimensional masks (if any value in a sample is false, the entire sample is filtered out)
+        if len(mask.shape) > 1:
+            return mask.all(dim=1)
+        else:
+            return mask

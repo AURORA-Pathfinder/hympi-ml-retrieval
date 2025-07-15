@@ -1,9 +1,10 @@
 """A useful set of utility functions that wrap around common MLFlow functionality."""
 
-import keras
+import glob
 
 import mlflow
-import mlflow.entities
+import mlflow.data
+import mlflow.data.dataset
 from mlflow.tracking._tracking_service.client import TrackingServiceClient
 
 from matplotlib.figure import Figure
@@ -46,31 +47,22 @@ def get_artifacts_uri(run_id: str) -> str:
     return client._get_artifact_repo(run_id).artifact_uri
 
 
-def get_autolog_model(run_id: str) -> keras.Model:
-    """Returns the Keras model that is logged by MLFlow when autologging models is enabled
+def get_checkpoint_path(run_id: str, step: int | None = None) -> str:
+    """Returns the path of the PyTorch LightningModule checkpoint at the provided step.
+    If no step is provided, then it will find the latest checkpoint saved in this run.
 
     Args:
         run_id (str): The id of the mlflow run.
+        step (int): The step the checkpoint was saved at (often in the title of the checkpoint file itself).
 
     Returns:
-        keras.Model: The loaded Keras model.
-    """
-    return get_model(run_id, "model/data/model.keras")
-
-
-def get_model(run_id: str, local_artifact_path: str) -> keras.Model:
-    """Returns a keras model located in the artifacts of the run at the local artifact path.
-
-    Args:
-        run_id (str): The id of the mlflow run.
-        local_artifact_path (str): The local path of the model in the artifacts directory of the mlflow run.
-
-    Returns:
-        keras.Model: The loaded Keras model.
+        str: The absolute file path to the checkpoint file.
     """
     artifacts_uri = get_artifacts_uri(run_id)[7:]
-    model_path = f"{artifacts_uri}/{local_artifact_path}"
-    return keras.models.load_model(model_path)
+
+    step_str = step or "*"
+    files = glob.glob(f"{artifacts_uri}/*/epoch=*-step={step_str}*.ckpt")
+    return sorted(files)[0]
 
 
 def get_datasets_by_context(run_id: str) -> dict[str, mlflow.data.Dataset]:

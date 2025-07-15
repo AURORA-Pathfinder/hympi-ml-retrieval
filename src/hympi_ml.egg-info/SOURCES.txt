@@ -1,6 +1,7 @@
 README.md
 pyproject.toml
 src/hympi_ml/__init__.py
+src/hympi_ml/model.py
 src/hympi_ml.egg-info/PKG-INFO
 src/hympi_ml.egg-info/SOURCES.txt
 src/hympi_ml.egg-info/dependency_links.txt
@@ -20,11 +21,8 @@ src/hympi_ml/evaluation/__init__.py
 src/hympi_ml/evaluation/figs.py
 src/hympi_ml/evaluation/metrics.py
 src/hympi_ml/layers/__init.__.py
-src/hympi_ml/layers/loss.py
 src/hympi_ml/layers/mlp.py
 src/hympi_ml/layers/noise.py
-src/hympi_ml/layers/transform.py
 src/hympi_ml/utils/__init__.py
 src/hympi_ml/utils/gpu.py
-src/hympi_ml/utils/keras_utils.py
-src/hympi_ml/utils/mlflow_log.py
+src/hympi_ml/utils/mlf.py

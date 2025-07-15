@@ -1,175 +1,152 @@
-import os
-
-os.environ["KERAS_BACKEND"] = "torch"
-
-import keras
-
 import lightning as L
+from lightning.pytorch.loggers import MLFlowLogger
+
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-from hympi_ml.data import (
-    DataSpec,
-    DataSource,
-    CosmirhSpec,
-    AMPRSpec,
-    NRSpec,
-    ch06,
-    RFBand,
-)
+import torchmetrics.regression as re
 
-from hympi_ml.data.cosmirh import C50_BAND, C183_BAND
+from hympi_ml.data import CosmirhSpec, AMPRSpec, NRSpec, ATMSSpec
+
+from hympi_ml.data import cosmirh
 from hympi_ml.data.ch06 import Ch06Source
-from hympi_ml.data.model_dataset import ModelDataset
+from hympi_ml.data.model_dataset import get_split_datasets
+from hympi_ml.model import MLPModel
+from hympi_ml.utils import mlf
 
-
-class SpecModel(L.LightningModule):
-    def __init__(
-        self,
-        features: dict[str, DataSpec],
-        targets: dict[str, DataSpec],
-        feature_paths: dict[str, nn.Module],
-        output_path: nn.Module,
-        loss,
-    ):
-        super().__init__()
-        self.features = features
-        self.targets = targets
-        self.feature_paths = feature_paths
-        self.output_path = output_path
-        self.loss = loss
-
-    def forward(self, inputs):
-        # go through all feature paths for each feature and combine them into one tensor
-        features_forward = [
-            path.cuda()(self.features[k].apply_batch(inputs[k]))
-            for k, path in self.feature_paths.items()
-        ]
-        stacked_features = torch.hstack(features_forward)
-
-        # run stacked features tensor into the output path for each target
-        return {
-            k: nn.LazyLinear(target.shape[0]).cuda()(self.output_path(stacked_features))
-            for k, target in targets.items()
-        }
-
-    def training_step(self, batch, batch_idx):
-        inputs, targets = batch
-        output = self(inputs)
-
-        losses = {
-            k: nn.functional.l1_loss(output[k], self.targets[k].apply_batch(targets[k]))
-            for k in self.targets.keys()
-        }
-
-        losses["loss"] = torch.vstack(list(losses.values())).sum()
-
-        self.log_dict(losses, prog_bar=True)
-
-        return losses
-
-    def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters())
-
-
+# data setup
 features = {
-    "CH_16": CosmirhSpec(
-        frequencies=[
-            C50_BAND.scale(16),
-            C183_BAND.scale(16),
-        ],
-        ignore_frequencies=[  # problematic CRTM frequencies
-            56.96676875,
-            57.60739375,
-            57.6113,
-            57.61520625,
-        ],
-        scale_range=(200, 300),
-    ),
-    "AMPR": AMPRSpec(),
+    # "CH": CosmirhSpec(
+    #     frequencies=[
+    #         cosmirh.C50_BAND,
+    #         cosmirh.C183_BAND,
+    #     ],
+    #     ignore_frequencies=[  # problematic CRTM frequencies
+    #         56.96676875,
+    #         57.60739375,
+    #         57.6113,
+    #         57.61520625,
+    #     ],
+    # ),
+    "ATMS": ATMSSpec(),
+    # "AMPR": AMPRSpec(),
 }
 
 targets = {
+    # "PBLH": NRSpec(
+    #     dataset="PBLH",
+    #     scale_range=(200, 2000),
+    #     filter_range=(200, 2000),
+    # )
     "TEMPERATURE": NRSpec(
         dataset="TEMPERATURE",
         scale_range=(175.0, 325.0),
     ),
-    "WATER_VAPOR": NRSpec(
-        dataset="WATER_VAPOR",
-        scale_range=(1.11e-7, 3.08e-2),
-    ),
+    # "WATER_VAPOR": NRSpec(
+    #     dataset="WATER_VAPOR",
+    #     # scale_range=(1.11e-7, 3.08e-2),
+    # ),
 }
 
-model = SpecModel(
+metrics = {
+    "mae": re.MeanAbsoluteError(),
+    "mse": re.MeanSquaredError(),
+    "rmse": re.NormalizedRootMeanSquaredError(),
+}
+
+# define model
+model = MLPModel(
     features=features,
     targets=targets,
+    loss=re.MeanAbsoluteError(),
+    val_metrics=metrics,
+    test_metrics=metrics,
     feature_paths={
-        "CH_16": nn.Sequential(
-            nn.LazyLinear(96),
+        # "CH": nn.Sequential(
+        #     nn.LazyLinear(512),
+        #     nn.GELU(),
+        #     nn.LazyLinear(256),
+        #     nn.GELU(),
+        #     nn.LazyLinear(128),
+        #     nn.GELU(),
+        # ),
+        "ATMS": nn.Sequential(
+            nn.Linear(22, 32),
+            nn.GELU(),
+            nn.Linear(32, 32),
             nn.GELU(),
         ),
-        "AMPR": nn.Sequential(
-            nn.LazyLinear(8),
-            nn.GELU(),
-        ),
+        # "AMPR": nn.Sequential(
+        #     nn.Linear(8, 8),
+        #     nn.GELU(),
+        # ),
     },
     output_path=nn.Sequential(
         nn.LazyLinear(128),
         nn.GELU(),
-        nn.LazyLinear(128),
-        nn.GELU(),
         nn.LazyLinear(72),
     ),
-    loss=nn.MSELoss(),
 )
 
-train_dataset = ModelDataset(
-    Ch06Source(
+# define datasets
+train, val, test = get_split_datasets(
+    features=features,
+    targets=targets,
+    train_source=Ch06Source(
         days=[
             "20060115",
-            "20060215",
+            # "20060215",
             # "20060315", # removed due to space constraints
-            "20060415",
-            "20060515",
-            "20060615",
-            "20060715",
-            "20061015",
-            "20061115",
+            # "20060415",
+            # "20060515",
+            # "20060615",
+            # "20060715",
+            # "20060815",
+            # "20061015",
+            # "20061115", # test
         ]
     ),
-    features=features,
-    targets=targets,
+    validation_source=Ch06Source(days=["20061115"]),
+    test_source=Ch06Source(days=["20061115"]),
     batch_size=8192,
 )
 
-train_loader = DataLoader(
-    train_dataset,
-    batch_size=None,
-    shuffle=True,
-    num_workers=40,
-    pin_memory=True,
-    prefetch_factor=1,
-)
+# create loaders
+loader_params = {
+    "batch_size": None,
+    "num_workers": 20,
+    "pin_memory": True,
+    "prefetch_factor": 1,
+}
 
-trainer = L.Trainer(enable_progress_bar=True, max_epochs=2, enable_model_summary=True)
-trainer.fit(model=model, train_dataloaders=train_loader)
+train_loader = DataLoader(train, shuffle=True, **loader_params)
+val_loader = DataLoader(val, **loader_params)
+test_loader = DataLoader(test, **loader_params)
 
+# train!
+tracking_uri = "/explore/nobackup/people/dgershm1/mlruns"
 
-test_dataset = ModelDataset(
-    Ch06Source(days=["20060815"]),
-    features=features,
-    targets=targets,
-    batch_size=8192,
-)
+with mlf.start_run(
+    tracking_uri=tracking_uri,
+    experiment_name="+".join(targets.keys()),
+    log_datasets=False,
+) as run:
+    mlf_logger = MLFlowLogger(
+        run_id=run.info.run_id,
+        tracking_uri=tracking_uri,
+        log_model=True,
+    )
 
-test_loader = DataLoader(
-    test_dataset,
-    batch_size=None,
-    shuffle=True,
-    num_workers=40,
-    pin_memory=True,
-    prefetch_factor=1,
-)
+    train.log("train")
+    val.log("val")
+    test.log("test")
 
-# trainer.test(model=model, dataloaders=test_loader)
+    trainer = L.Trainer(
+        enable_progress_bar=True,
+        max_epochs=1,
+        enable_model_summary=True,
+        logger=mlf_logger,
+    )
+
+    trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)

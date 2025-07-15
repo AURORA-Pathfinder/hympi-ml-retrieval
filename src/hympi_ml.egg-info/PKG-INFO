@@ -5,11 +5,12 @@ Summary: Add your description here
 Requires-Python: >=3.12
 Description-Content-Type: text/markdown
 Requires-Dist: keras>=3.9.2
-Requires-Dist: lightning>=2.5.1.post0
-Requires-Dist: mlflow>=2.22.0
+Requires-Dist: lightning==2.5.0
+Requires-Dist: mlflow>=3.1.0
 Requires-Dist: notebook>=7.3.3
 Requires-Dist: numpy>=2.2.4
 Requires-Dist: torch>=2.6.0
+Requires-Dist: torchmetrics>=1.7.2
 
 # HyMPI ML Retrieval (DSI/IRAD)
 

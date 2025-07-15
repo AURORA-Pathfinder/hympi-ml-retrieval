@@ -1,10 +1,9 @@
-import collections.abc
+from collections.abc import Sequence
 
 import numpy as np
-# import tensorflow as tf
 
 
-class MemmapSequence(collections.abc.Sequence):
+class MemmapSequence(Sequence):
     """
     A wrapper class for a list of memmaps that represent a single, combined dataset.
 
@@ -85,9 +84,6 @@ class MemmapSequence(collections.abc.Sequence):
                 return slices[0]
             else:
                 return np.concatenate(slices)
-            # else:
-            # print(val)
-            # return None
 
         if isinstance(val, np.ndarray):
             samples = []
@@ -122,36 +118,3 @@ class MemmapSequence(collections.abc.Sequence):
         Note: This may take a while if this sequence lots of data. Use wisely.
         """
         return np.concatenate(self.memmaps)
-
-    # def to_tf_dataset(self, dtype: tf.DType = tf.float64, load_batch_size: int = 1024) -> tf.data.Dataset:
-    #     """
-    #     Creates a tensorflow.data.Dataset from this MemmapSequence.
-
-    #     Args:
-    #         load_batch_size (int, optional): The size of the batches used for loading, the data does not come batched
-    #             Defaults to 1024.
-
-    #     Returns:
-    #         tf.data.Dataset: The generated dataset.
-    #     """
-    #     shape = (load_batch_size,) + self.data_shape
-
-    #     if shape == (load_batch_size, 1):
-    #         shape = (load_batch_size,)
-
-    #     batches = math.floor(len(self) / load_batch_size)
-
-    #     def gen():
-    #         for i in range(batches):
-    #             start = i * load_batch_size
-    #             stop = start + load_batch_size
-    #             yield self[start:stop]
-
-    #     return (
-    #         tf.data.Dataset.from_generator(
-    #             generator=gen,
-    #             output_signature=tf.TensorSpec(shape=shape, dtype=dtype),
-    #         )
-    #         .unbatch()
-    #         .apply(tf.data.experimental.assert_cardinality(batches * load_batch_size))
-    #     )
