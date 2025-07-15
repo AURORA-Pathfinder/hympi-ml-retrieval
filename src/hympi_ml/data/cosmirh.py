@@ -1,15 +1,19 @@
 from abc import abstractmethod
-import collections.abc
+from collections.abc import Sequence
 
 import torch
 
-import numpy as np
-
 from hympi_ml.data import DataSpec, DataSource, RFBand
 
-C50_BAND = RFBand(low=50.0019, high=57.99799375, resolution=0.00390625)
-C183_BAND = RFBand(low=175.3120, high=191.30809375, resolution=0.00390625)
+C50_BAND = RFBand(low=50.0019, high=57.99799375, channel_width=0.00390625)
+"""The 50 GHz band of CoSMIR-H from ~50-58 GHz containing 2048 individual channels."""
+
+C183_BAND = RFBand(low=175.3120, high=191.30809375, channel_width=0.00390625)
+"""The 183 GHz band of CoSMIR-H from ~175-192 GHz containing 4096 individual channels."""
+
 WINDOW_CHANNELS = [89.00, 165.30]
+"""The 4 window channels of CoSMIR-H data. Note that this list only contains the pure frequency values (two floats)
+as each frequency is horizontally and vertically polarized"""
 
 
 class CosmirhSource(DataSource):
@@ -19,7 +23,7 @@ class CosmirhSource(DataSource):
 
     @property
     @abstractmethod
-    def ch(self) -> collections.abc.Sequence:
+    def ch(self) -> Sequence:
         """
         Loads the entire set of cosmir-h data as a sequence of samples each with a size of 6148 channels the order:
         1. 2048 channel 50-58 GHz band
@@ -89,9 +93,7 @@ class CosmirhSpec(DataSpec):
     def units(self) -> str:
         return "Brightness Temperature (K)"
 
-    def load_raw_slice(
-        self, source: CosmirhSource, start: int, end: int
-    ) -> collections.abc.Sequence:
+    def load_raw_slice(self, source: CosmirhSource, start: int, end: int) -> Sequence:
         if not isinstance(source, CosmirhSource):
             raise Exception(
                 "The provided loader does not have support for loading CoSMIR-H data."
@@ -100,7 +102,6 @@ class CosmirhSpec(DataSpec):
         return source.ch[start:end]
 
     def apply_batch(self, batch) -> torch.Tensor:
-        batch = torch.index_select(
-            batch, dim=1, index=torch.tensor(self.indices).cuda()
-        )
+        indices_tensor = torch.tensor(self.indices, device=batch.device)
+        batch = torch.index_select(batch, dim=1, index=indices_tensor)
         return super().apply_batch(batch)

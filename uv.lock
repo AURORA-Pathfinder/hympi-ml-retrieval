@@ -895,6 +895,7 @@ dependencies = [
     { name = "notebook" },
     { name = "numpy" },
     { name = "torch" },
+    { name = "torchmetrics" },
 ]
 
 [package.dev-dependencies]
@@ -905,11 +906,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "keras", specifier = ">=3.9.2" },
-    { name = "lightning", specifier = ">=2.5.1.post0" },
-    { name = "mlflow", specifier = ">=2.22.0" },
+    { name = "lightning", specifier = "==2.5.0" },
+    { name = "mlflow", specifier = ">=3.1.0" },
     { name = "notebook", specifier = ">=7.3.3" },
     { name = "numpy", specifier = ">=2.2.4" },
     { name = "torch", specifier = ">=2.6.0" },
+    { name = "torchmetrics", specifier = ">=1.7.2" },
 ]
 
 [package.metadata.requires-dev]
@@ -1343,7 +1345,7 @@ wheels = [
 
 [[package]]
 name = "lightning"
-version = "2.5.1.post0"
+version = "2.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fsspec", extra = ["http"] },
@@ -1356,9 +1358,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/97/d0/fb3c5077efdd74c28ea3a277fd80bbf03738d866013a8637691138bfebca/lightning-2.5.1.post0.tar.gz", hash = "sha256:fda1ac63c283b3b08a54be8d905dd88469cf09e9845d36dd28b699e78911cbc8", size = 631113 }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/54/bab19fc8b89ad35e57a3d66a0c3b5d0822d51986766def618d1edfba5f03/lightning-2.5.0.tar.gz", hash = "sha256:3090d979acbc5a97a91906687f9530a246f357fd6b1a81a38d8a8c998ba6db5f", size = 628381 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/1b/67201d693a575e8a086831710f33e697fab66166223f792e459ef2b84934/lightning-2.5.1.post0-py3-none-any.whl", hash = "sha256:a228a52ca52f0c5006ff327c92b8942f09e1aea3f2d9b0d7c8a209edd5b9e71d", size = 819001 },
+    { url = "https://files.pythonhosted.org/packages/e3/2b/b979c8e2c688469a91743c2cc0ad64c683310ad8dbccc183fd03eaa1e85d/lightning-2.5.0-py3-none-any.whl", hash = "sha256:f2c3ad24c7e2ba57951d05d7e12e2c8a9fb375ebe6277c300bbade3bda3aecce", size = 815317 },
 ]
 
 [[package]]
@@ -1385,15 +1387,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/62/4f/ddb1965901bc388958db9f0c991255b2c469349a741ae8c9cd8a562d70a6/mako-1.3.9.tar.gz", hash = "sha256:b5d65ff3462870feec922dbccf38f6efb44e5714d7b593a656be86663d8600ac", size = 392195 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cd/83/de0a49e7de540513f53ab5d2e105321dedeb08a8f5850f0208decf4390ec/Mako-1.3.9-py3-none-any.whl", hash = "sha256:95920acccb578427a9aa38e37a186b1e43156c87260d7ba18ca63aa4c7cbd3a1", size = 78456 },
-]
-
-[[package]]
-name = "markdown"
-version = "3.7"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/54/28/3af612670f82f4c056911fbbbb42760255801b3068c48de792d354ff4472/markdown-3.7.tar.gz", hash = "sha256:2ae2471477cfd02dbbf038d5d9bc226d40def84b4fe2986e49b59b6b472bbed2", size = 357086 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/08/83871f3c50fc983b88547c196d11cf8c3340e37c32d2e9d6152abe2c61f7/Markdown-3.7-py3-none-any.whl", hash = "sha256:7eb6df5690b81a1d7942992c97fad2938e956e79df20cbc6186e9c3a77b1c803", size = 106349 },
 ]
 
 [[package]]
@@ -1537,7 +1530,7 @@ wheels = [
 
 [[package]]
 name = "mlflow"
-version = "2.22.0"
+version = "3.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -1545,8 +1538,6 @@ dependencies = [
     { name = "flask" },
     { name = "graphene" },
     { name = "gunicorn", marker = "sys_platform != 'win32'" },
-    { name = "jinja2" },
-    { name = "markdown" },
     { name = "matplotlib" },
     { name = "mlflow-skinny" },
     { name = "numpy" },
@@ -1557,14 +1548,14 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "waitress", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2c/22/a2d2fa7d142959720a3c5b5ffcd914be9fe02e299734ddd21c293a797981/mlflow-2.22.0.tar.gz", hash = "sha256:5b8780a8407c1b2ad441a13054f33ed0a0a58df4a69ddada2e30321d287e4f87", size = 28375641 }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/e1/0cba7a8fc2c81078b4d31948f65fb1580cee1831e955a86028159724d057/mlflow-3.1.1.tar.gz", hash = "sha256:ee98fe929d61625b72ae5010fbf12a7c6d15527790397827191fd6e8246c33e5", size = 24098836 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/28/8f/b3bdbaf3f060801e5d8b7b7f3b67c79e3d12939c67002f9a618150317a29/mlflow-2.22.0-py3-none-any.whl", hash = "sha256:3ada72e39bd7b381c360aa9baddeb701d41f0b83b5889ddab7fdc6d7a5bc9b52", size = 29002380 },
+    { url = "https://files.pythonhosted.org/packages/a2/07/9f28e7e2b1c9552e64e6161cd3943b02349f8164176cea6b75e69d7df94a/mlflow-3.1.1-py3-none-any.whl", hash = "sha256:16853335292217fde203a645fd50f38d5567ce7818587ed5236040418918872e", size = 24673365 },
 ]
 
 [[package]]
 name = "mlflow-skinny"
-version = "2.22.0"
+version = "3.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cachetools" },
@@ -1585,9 +1576,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "uvicorn" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/16/1e/7d29817fa2370f88550e86ae2be4bee5f9efe82169032dc5b1cab642e5b6/mlflow_skinny-2.22.0.tar.gz", hash = "sha256:774b58970038990650486cd934d46b7038fc390682c3bde70b4e5106f6857cce", size = 5889903 }
+sdist = { url = "https://files.pythonhosted.org/packages/dd/52/e63c0244a24ed23b5f82b30efffce150c19f126b8ef977b78a56f6d192c9/mlflow_skinny-3.1.1.tar.gz", hash = "sha256:9c2ea510eef6c115c7241305b65f7090d7fdc02399de2a6e8ddae5f285bb7a99", size = 1603411 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/eb/53dd2a5db1040a21da2980c382ebe3a9bda2d8af8365c2d01053c924b150/mlflow_skinny-2.22.0-py3-none-any.whl", hash = "sha256:9efc39454f6cc3433e7d804c3df8dab4fbba1abe504c52c05f00ef1d0696fef5", size = 6268849 },
+    { url = "https://files.pythonhosted.org/packages/f6/45/24d553e0f550f82aaadd8b9d08f1410a3d750c51733a5f43fcc6def1be00/mlflow_skinny-3.1.1-py3-none-any.whl", hash = "sha256:73b1be5d0ef3099c2d0e5ec3ca7fd0b85d4a6def7d7ab35feda9f06bf8bf7049", size = 1926660 },
 ]
 
 [[package]]

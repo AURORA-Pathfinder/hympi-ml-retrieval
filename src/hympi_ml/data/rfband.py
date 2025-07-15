@@ -3,23 +3,23 @@ from pydantic import BaseModel
 
 
 class RFBand(BaseModel):
-    """A class that defines a band of radiofrequency (RF) at an optional resolution.
+    """A class that defines a band of radiofrequency (RF) at an optional channel width.
     This is meant to be paired with other data to define Radiometer specifications.
 
     Note that there is no checks for order of magnitude. Ensure that the RFBand you implement
-    are all using the same units (normally it's GHz for Hyperspectral data).
+    are all using the same units (normally it's GHz/MHz for Hyperspectral data).
     """
 
     low: float
     high: float
-    resolution: float | None = None
+    channel_width: float | None = None
 
     @property
     def _order(self) -> int:
-        return len(str(self.resolution).split(".")[1])
+        return len(str(self.channel_width).split(".")[1])
 
     def __contains__(self, f: float) -> bool:
-        """Checks if the provided frequency is contained in this frequency band and resolution.
+        """Checks if the provided frequency is contained in this frequency band and channel width.
 
         Args:
             f (float): The frequency to check.
@@ -31,32 +31,32 @@ class RFBand(BaseModel):
         if not (f >= self.low and f <= self.high):
             return False
 
-        if self.resolution is None:
+        if self.channel_width is None:
             return True
 
         diff = round(f - self.low, self._order)
 
-        return round(diff / self.resolution, self._order) % 1 == 0
+        return round(diff / self.channel_width, self._order) % 1 == 0
 
     def to_array(self) -> list[float]:
         """Expands the frequency band into an array containing all possible values in the range
-            at the resolution.
+            at the channel width.
 
         Raises:
-            ValueError: If no resolution was defined for this band.
+            ValueError: If no channel width was defined for this band.
 
         Returns:
             list[float]: An array containing all frequencies in this band.
         """
-        if self.resolution is None:
+        if self.channel_width is None:
             raise ValueError(
-                "No resolution provided for this band. Cannot convert to any array without a resolution."
+                "No channel width provided for this band. Cannot convert to any array without a channel width."
             )
 
-        order = len(str(self.resolution).split(".")[1])
+        order = len(str(self.channel_width).split(".")[1])
 
-        stop = round(self.high + self.resolution, order)
-        ha_freqs = np.arange(self.low, stop, step=self.resolution)
+        stop = round(self.high + self.channel_width, order)
+        ha_freqs = np.arange(self.low, stop, step=self.channel_width)
 
         return [float(round(f, order)) for f in ha_freqs]
 
@@ -72,28 +72,28 @@ class RFBand(BaseModel):
         if f not in self:
             raise ValueError(f"Frequency {f} not found in band.")
 
-        if self.resolution is None:
+        if self.channel_width is None:
             raise ValueError(
-                f"No resolution provided for this band. Cannot find index of {f} without a resolution."
+                f"No channel width provided for this band. Cannot find index of {f} without a channel width."
             )
 
-        return round((f - self.low) / self.resolution)
+        return round((f - self.low) / self.channel_width)
 
     def intersection(self, other: "RFBand") -> list[float]:
         """
         Returns a list of frequencies that exist in this band and the provided band.
         """
-        if self.resolution is None and other.resolution is None:
+        if self.channel_width is None and other.channel_width is None:
             raise ValueError(
-                "Neither band has a resolution, no intersection can be found."
+                "Neither band has a channel width, no intersection can be found."
             )
 
-        if self.resolution is not None and other.resolution is not None:
+        if self.channel_width is not None and other.channel_width is not None:
             self_set = set(self.to_array())
             other_set = set(other.to_array())
             return list(self_set.intersection(other_set))
 
-        if self.resolution is None:
+        if self.channel_width is None:
             no_res = self
             with_res = other
         else:
@@ -119,14 +119,14 @@ class RFBand(BaseModel):
 
     def scale(self, factor: float):
         """
-        Returns a new RFBand with the resolution scaled by the provided factor.
+        Returns a new RFBand with the channel width scaled by the provided factor.
 
         Raises:
-            ValueError: If no resolution is defined for this band.
+            ValueError: If no channel width is defined for this band.
         """
-        if self.resolution is not None:
+        if self.channel_width is not None:
             return RFBand(
-                low=self.low, high=self.high, resolution=self.resolution * factor
+                low=self.low, high=self.high, channel_width=self.channel_width * factor
             )
 
-        raise ValueError("Cannot scale RFBand with no resolution!")
+        raise ValueError("Cannot scale RFBand with no channel width!")

@@ -37,6 +37,7 @@ class Ch06Source(
 
         for day in self.days:
             files += glob.glob(f"{self.data_dir}/{day}/*/{name}.npy")
+            files = sorted(files)
 
         return [np.load(f, mmap_mode="r") for f in files]
 
