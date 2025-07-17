@@ -3,8 +3,7 @@
 import glob
 
 import mlflow
-import mlflow.data
-import mlflow.data.dataset
+from mlflow.data.dataset import Dataset
 from mlflow.tracking._tracking_service.client import TrackingServiceClient
 
 from matplotlib.figure import Figure
@@ -65,7 +64,7 @@ def get_checkpoint_path(run_id: str, step: int | None = None) -> str:
     return sorted(files)[0]
 
 
-def get_datasets_by_context(run_id: str) -> dict[str, mlflow.data.Dataset]:
+def get_datasets_by_context(run_id: str) -> dict[str, Dataset]:
     """
     Given a run_id, this function gathers the datasets in an mlflow run and
     creates a dictionary with dataset's context tag as the key and the generic mflow dataset

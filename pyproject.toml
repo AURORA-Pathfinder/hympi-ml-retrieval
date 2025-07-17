@@ -5,7 +5,6 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "keras>=3.9.2",
     "lightning==2.5.0", # pinned to 2.5.0 due to errors with MLFlow integration after this version.
     "mlflow>=3.1.0",
     "notebook>=7.3.3",

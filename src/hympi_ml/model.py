@@ -3,7 +3,10 @@ from typing import Literal, Mapping
 import torch
 from torch import nn
 import lightning as L
-from torchmetrics import Metric
+from lightning.pytorch.loggers import MLFlowLogger
+from torchmetrics import Metric, MetricCollection
+import numpy as np
+import mlflow
 
 from hympi_ml.data import DataSpec
 
@@ -13,9 +16,9 @@ class SpecModel(L.LightningModule):
         self,
         features: Mapping[str, DataSpec],
         targets: Mapping[str, DataSpec],
-        loss: Metric,
-        val_metrics: dict[str, Metric],
-        test_metrics: dict[str, Metric],
+        train_metrics: Mapping[str, MetricCollection],
+        val_metrics: Mapping[str, MetricCollection],
+        test_metrics: Mapping[str, MetricCollection],
         learning_rate: float = 0.001,
         weight_decay: float = 0,
     ):
@@ -26,7 +29,7 @@ class SpecModel(L.LightningModule):
 
         self.features = features
         self.targets = targets
-        self.loss = loss
+        self.train_metrics = train_metrics
         self.val_metrics = val_metrics
         self.test_metrics = test_metrics
 
@@ -66,45 +69,22 @@ class SpecModel(L.LightningModule):
         return transformed_features, transformed_targets
 
     def calculate_metrics(
-        self,
-        pred: torch.Tensor,
-        truth: torch.Tensor,
-        metrics: dict[str, Metric],
-        target_name: str,
-        context: Literal["train", "val", "test"],
-        log: bool,
-    ) -> dict[str, torch.Tensor]:
-        computed_metrics = {
-            f"{context}_{target_name}_{f_name}": func.cuda()(pred, truth)
-            for f_name, func in metrics.items()
-        }
+        self, raw_batch: torch.Tensor, metrics: Mapping[str, MetricCollection]
+    ):
+        inputs, targets = self.transform_batch(raw_batch)
+        outputs = self(inputs)
 
-        if log:
-            loggable_metrics = {
-                k: v for k, v in computed_metrics.items() if v.shape == ()
-            }
-            self.log_dict(loggable_metrics)
+        computed_metrics = {}
+
+        for k in self.targets.keys():
+            target_metrics = metrics[k]
+            target_metrics.prefix = f"{target_metrics.prefix}{k}_"
+            computed_metrics.update(target_metrics(outputs[k], targets[k]))
 
         return computed_metrics
 
     def training_step(self, batch, batch_idx):
-        inputs, targets = self.transform_batch(batch)
-        outputs = self(inputs)
-
-        metrics = {}
-
-        for k in self.targets.keys():
-            k_metrics = self.calculate_metrics(
-                pred=outputs[k],
-                truth=targets[k],
-                metrics={"loss": self.loss},
-                target_name=k,
-                context="train",
-                log=False,
-            )
-
-            metrics.update(k_metrics)
-
+        metrics = self.calculate_metrics(batch, self.train_metrics)
         metrics["loss"] = torch.vstack(list(metrics.values())).sum()
 
         self.log_dict(metrics, prog_bar=True)
@@ -112,32 +92,12 @@ class SpecModel(L.LightningModule):
         return metrics
 
     def validation_step(self, batch, batch_idx):
-        inputs, targets = self.transform_batch(batch)
-        outputs = self(inputs)
-
-        for k in self.targets.keys():
-            self.calculate_metrics(
-                pred=outputs[k],
-                truth=targets[k],
-                metrics=self.val_metrics,
-                target_name=k,
-                context="val",
-                log=True,
-            )
+        metrics = self.calculate_metrics(batch, self.val_metrics)
+        self.log_dict(metrics)
 
     def test_step(self, batch, batch_idx):
-        inputs, targets = self.transform_batch(batch)
-        outputs = self(inputs)
-
-        for k in self.targets.keys():
-            self.calculate_metrics(
-                pred=outputs[k],
-                truth=targets[k],
-                metrics=self.test_metrics,
-                target_name=k,
-                context="test",
-                log=True,
-            )
+        metrics = self.calculate_metrics(batch, self.test_metrics)
+        self.log_dict(metrics)
 
     def configure_optimizers(self):
         return torch.optim.Adam(
@@ -152,13 +112,13 @@ class MLPModel(SpecModel):
         self,
         features: Mapping[str, DataSpec],
         targets: Mapping[str, DataSpec],
-        loss: Metric,
-        val_metrics: dict[str, Metric],
-        test_metrics: dict[str, Metric],
+        train_metrics: Mapping[str, MetricCollection],
+        val_metrics: Mapping[str, MetricCollection],
+        test_metrics: Mapping[str, MetricCollection],
         feature_paths: dict[str, nn.Module],
         output_path: nn.Module,
     ):
-        super().__init__(features, targets, loss, val_metrics, test_metrics)
+        super().__init__(features, targets, train_metrics, val_metrics, test_metrics)
 
         # important! Used to ensure all above init params are saved!
         self.save_hyperparameters()

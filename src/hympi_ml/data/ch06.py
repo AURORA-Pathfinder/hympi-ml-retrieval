@@ -18,8 +18,8 @@ class Ch06Source(
     nature_run.NRSource,
 ):
     """
-    The data source for the 12 days of worth of simulated CRTM CosMIR-H, ATMS, AMPR, and Nature Run data.
-    The available days come in the format: 2006##15 where "##" is the month with a leading zero (as needed).
+    The data source for several days of worth of simulated CRTM CosMIR-H, ATMS, AMPR, and Nature Run data.
+    The available days come in the 2006MMDD format..
     """
 
     days: list[str]
