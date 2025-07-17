@@ -1,10 +1,10 @@
 import lightning as L
 from lightning.pytorch.loggers import MLFlowLogger
 
-import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
+from torchmetrics import MetricCollection
 import torchmetrics.regression as re
 
 from hympi_ml.data import CosmirhSpec, AMPRSpec, NRSpec, ATMSSpec
@@ -17,19 +17,19 @@ from hympi_ml.utils import mlf
 
 # data setup
 features = {
-    # "CH": CosmirhSpec(
-    #     frequencies=[
-    #         cosmirh.C50_BAND,
-    #         cosmirh.C183_BAND,
-    #     ],
-    #     ignore_frequencies=[  # problematic CRTM frequencies
-    #         56.96676875,
-    #         57.60739375,
-    #         57.6113,
-    #         57.61520625,
-    #     ],
-    # ),
-    "ATMS": ATMSSpec(),
+    "CH": CosmirhSpec(
+        frequencies=[
+            cosmirh.C50_BAND,
+            cosmirh.C183_BAND,
+        ],
+        ignore_frequencies=[  # problematic CRTM frequencies
+            56.96674375,
+            57.60736875,
+            57.611275,
+            57.61518125,
+        ],
+    ),
+    # "ATMS": ATMSSpec(),
     # "AMPR": AMPRSpec(),
 }
 
@@ -49,34 +49,60 @@ targets = {
     # ),
 }
 
-metrics = {
-    "mae": re.MeanAbsoluteError(),
-    "mse": re.MeanSquaredError(),
-    "rmse": re.NormalizedRootMeanSquaredError(),
+# metrics setup
+train_metrics = {
+    "TEMPERATURE": MetricCollection(
+        {
+            "mae": re.MeanAbsoluteError(),
+        },
+        prefix="train_",
+    )
+}
+
+val_metrics = {
+    "TEMPERATURE": MetricCollection(
+        {
+            "mae": re.MeanAbsoluteError(),
+            "mse": re.MeanSquaredError(),
+            "rmse": re.NormalizedRootMeanSquaredError(),
+        },
+        prefix="val_",
+    )
+}
+
+test_metrics = {
+    "TEMPERATURE": MetricCollection(
+        {
+            "mae": re.MeanAbsoluteError(),
+            "mse": re.MeanSquaredError(),
+            "rmse": re.NormalizedRootMeanSquaredError(),
+        },
+        prefix="test_",
+    )
 }
 
 # define model
 model = MLPModel(
     features=features,
     targets=targets,
-    loss=re.MeanAbsoluteError(),
-    val_metrics=metrics,
-    test_metrics=metrics,
+    train_metrics=train_metrics,
+    val_metrics=val_metrics,
+    test_metrics=test_metrics,
     feature_paths={
-        # "CH": nn.Sequential(
-        #     nn.LazyLinear(512),
-        #     nn.GELU(),
-        #     nn.LazyLinear(256),
-        #     nn.GELU(),
-        #     nn.LazyLinear(128),
-        #     nn.GELU(),
-        # ),
-        "ATMS": nn.Sequential(
-            nn.Linear(22, 32),
+        "CH": nn.Sequential(
+            nn.LazyLinear(512),
             nn.GELU(),
-            nn.Linear(32, 32),
+            nn.LazyLinear(256),
+            nn.GELU(),
+            nn.LazyLinear(128),
             nn.GELU(),
         ),
+        # "ATMS": nn.Sequential(
+        #     nn.Linear(22, 32),
+        #     nn.GELU(),
+        #     nn.Linear(32, 32),
+        #     nn.GELU(),
+        # ),
         # "AMPR": nn.Sequential(
         #     nn.Linear(8, 8),
         #     nn.GELU(),
@@ -96,14 +122,14 @@ train, val, test = get_split_datasets(
     train_source=Ch06Source(
         days=[
             "20060115",
-            # "20060215",
+            "20060215",
             # "20060315", # removed due to space constraints
-            # "20060415",
-            # "20060515",
-            # "20060615",
-            # "20060715",
-            # "20060815",
-            # "20061015",
+            "20060415",
+            "20060515",
+            "20060615",
+            "20060715",
+            "20060815",
+            "20061015",
             # "20061115", # test
         ]
     ),
@@ -133,8 +159,8 @@ with mlf.start_run(
     log_datasets=False,
 ) as run:
     mlf_logger = MLFlowLogger(
-        run_id=run.info.run_id,
         tracking_uri=tracking_uri,
+        run_id=run.info.run_id,
         log_model=True,
     )
 
