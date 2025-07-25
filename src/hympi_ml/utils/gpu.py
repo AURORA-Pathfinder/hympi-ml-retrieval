@@ -59,7 +59,9 @@ def set_gpus(count: int = 1, min_free: float = 0.99, verbose: bool = False):
         env_str += f"{index},"
 
     if len(indices) == 0:
-        raise Exception("Error attempting to find GPUs! No GPUs found that matched criteria! Please adjust parameters.")
+        raise Exception(
+            "Error attempting to find GPUs! No GPUs found that matched criteria! Please adjust parameters."
+        )
 
     os.environ["CUDA_VISIBLE_DEVICES"] = env_str
 
