@@ -1,124 +1,71 @@
 import lightning as L
+import lightning.pytorch.callbacks as callbacks
 from lightning.pytorch.loggers import MLFlowLogger
-
+import torch
 from torch import nn
-from torch.utils.data import DataLoader
-
 from torchmetrics import MetricCollection
 import torchmetrics.regression as re
 
-from hympi_ml.data import CosmirhSpec, AMPRSpec, NRSpec, ATMSSpec
+from hympi_ml.data import (
+    ModelDataSpec,
+    RawDataModule,
+    cosmirh,
+    CosmirhSpec,
+    AMPRSpec,
+    NRSpec,
+)
 
-from hympi_ml.data import cosmirh
+from hympi_ml.data.scale import MinMaxScaler
+from hympi_ml.data.filter import SimpleRangeFilter
+
 from hympi_ml.data.ch06 import Ch06Source
-from hympi_ml.data.model_dataset import get_split_datasets
 from hympi_ml.model import MLPModel
 from hympi_ml.utils import mlf
 
-# data setup
-features = {
-    "CH": CosmirhSpec(
-        frequencies=[
-            cosmirh.C50_BAND,
-            cosmirh.C183_BAND,
-        ],
-        ignore_frequencies=[  # problematic CRTM frequencies
-            56.96674375,
-            57.60736875,
-            57.611275,
-            57.61518125,
-        ],
-    ),
-    # "ATMS": ATMSSpec(),
-    # "AMPR": AMPRSpec(),
-}
-
-targets = {
-    # "PBLH": NRSpec(
-    #     dataset="PBLH",
-    #     scale_range=(200, 2000),
-    #     filter_range=(200, 2000),
-    # )
-    "TEMPERATURE": NRSpec(
-        dataset="TEMPERATURE",
-        scale_range=(175.0, 325.0),
-    ),
-    # "WATER_VAPOR": NRSpec(
-    #     dataset="WATER_VAPOR",
-    #     # scale_range=(1.11e-7, 3.08e-2),
-    # ),
-}
-
-# metrics setup
-train_metrics = {
-    "TEMPERATURE": MetricCollection(
-        {
-            "mae": re.MeanAbsoluteError(),
-        },
-        prefix="train_",
-    )
-}
-
-val_metrics = {
-    "TEMPERATURE": MetricCollection(
-        {
-            "mae": re.MeanAbsoluteError(),
-            "mse": re.MeanSquaredError(),
-            "rmse": re.NormalizedRootMeanSquaredError(),
-        },
-        prefix="val_",
-    )
-}
-
-test_metrics = {
-    "TEMPERATURE": MetricCollection(
-        {
-            "mae": re.MeanAbsoluteError(),
-            "mse": re.MeanSquaredError(),
-            "rmse": re.NormalizedRootMeanSquaredError(),
-        },
-        prefix="test_",
-    )
-}
-
-# define model
-model = MLPModel(
-    features=features,
-    targets=targets,
-    train_metrics=train_metrics,
-    val_metrics=val_metrics,
-    test_metrics=test_metrics,
-    feature_paths={
-        "CH": nn.Sequential(
-            nn.LazyLinear(512),
-            nn.GELU(),
-            nn.LazyLinear(256),
-            nn.GELU(),
-            nn.LazyLinear(128),
-            nn.GELU(),
+# data specification
+spec = ModelDataSpec(
+    features={
+        "CH": CosmirhSpec(
+            frequencies=[
+                cosmirh.C50_BAND,
+                cosmirh.C183_BAND,
+            ],
+            ignore_frequencies=[  # problematic CRTM frequencies
+                56.9667968,
+                57.6074218,
+                57.611328,
+                57.6152343,
+            ],
         ),
-        # "ATMS": nn.Sequential(
-        #     nn.Linear(22, 32),
-        #     nn.GELU(),
-        #     nn.Linear(32, 32),
-        #     nn.GELU(),
+        # "AMPR": AMPRSpec(),
+    },
+    targets={
+        "PBLH": NRSpec(
+            dataset="PBLH",
+            scaler=MinMaxScaler(minimum=200, maximum=2000),
+            filter=SimpleRangeFilter(minimum=200, maximum=2000),
+        ),
+        # "TEMPERATURE": NRSpec(
+        #     dataset="TEMPERATURE",
+        #     scaler=MinMaxScaler(minimum=175.0, maximum=325.0),
         # ),
-        # "AMPR": nn.Sequential(
-        #     nn.Linear(8, 8),
-        #     nn.GELU(),
+        # "WATER_VAPOR": NRSpec(
+        #     dataset="WATER_VAPOR",
+        #     scaler=MinMaxScaler(minimum=1.11e-7, maximum=3.08e-2),
         # ),
     },
-    output_path=nn.Sequential(
-        nn.LazyLinear(128),
-        nn.GELU(),
-        nn.LazyLinear(72),
-    ),
+    extras={
+        # "PBLH": NRSpec(
+        #     dataset="PBLH",
+        #     # scaler=MinMaxScaler(minimum=200, maximum=2000),
+        #     filter=SimpleRangeFilter(minimum=200, maximum=2000),
+        # ),
+    },
 )
 
-# define datasets
-train, val, test = get_split_datasets(
-    features=features,
-    targets=targets,
+# define data module (train, val, test)
+datamodule = RawDataModule(
+    spec=spec,
     train_source=Ch06Source(
         days=[
             "20060115",
@@ -130,49 +77,129 @@ train, val, test = get_split_datasets(
             "20060715",
             "20060815",
             "20061015",
-            # "20061115", # test
+            # "20061115",  # test
         ]
     ),
-    validation_source=Ch06Source(days=["20061115"]),
+    val_source=Ch06Source(days=["20061115"]),
     test_source=Ch06Source(days=["20061115"]),
     batch_size=8192,
+    num_workers=20,
 )
 
-# create loaders
-loader_params = {
-    "batch_size": None,
-    "num_workers": 20,
-    "pin_memory": True,
-    "prefetch_factor": 1,
+# metrics setup
+train_metrics = {
+    # "TEMPERATURE": MetricCollection(
+    #     {
+    #         "mae": re.MeanAbsoluteError(),
+    #     },
+    # ),
+    "PBLH": MetricCollection(
+        {
+            "mae": re.MeanAbsoluteError(),
+        },
+    ),
 }
 
-train_loader = DataLoader(train, shuffle=True, **loader_params)
-val_loader = DataLoader(val, **loader_params)
-test_loader = DataLoader(test, **loader_params)
+val_metrics = {
+    # "TEMPERATURE": MetricCollection(
+    #     {
+    #         "mae": re.MeanAbsoluteError(),
+    #         "mse": re.MeanSquaredError(),
+    #         "rmse": re.NormalizedRootMeanSquaredError(),
+    #     },
+    # ),
+    "PBLH": MetricCollection(
+        {
+            "mae": re.MeanAbsoluteError(),
+        },
+    ),
+}
+
+test_metrics = {
+    # "TEMPERATURE": MetricCollection(
+    #     {
+    #         "mae": re.MeanAbsoluteError(),
+    #         "mse": re.MeanSquaredError(),
+    #         "rmse": re.NormalizedRootMeanSquaredError(),
+    #     },
+    # ),
+    "PBLH": MetricCollection(
+        {
+            "mae": re.MeanAbsoluteError(),
+        },
+    ),
+}
+
+# define model
+model = MLPModel(
+    spec=spec,
+    train_metrics=train_metrics,
+    val_metrics=val_metrics,
+    test_metrics=test_metrics,
+    feature_paths={
+        "CH": nn.Sequential(
+            nn.LazyLinear(1024),
+            nn.GELU(),
+            nn.LazyLinear(256),
+            nn.GELU(),
+            nn.LazyLinear(128),
+            nn.GELU(),
+        ),
+        # "AMPR": nn.Sequential(
+        #     nn.Linear(8, 8),
+        #     nn.GELU(),
+        # ),
+    },
+    output_path=nn.Sequential(
+        nn.LazyLinear(64),
+        nn.GELU(),
+        nn.LazyLinear(1),
+    ),
+)
+
+# set up optimizer
+opt = torch.optim.NAdam(model.parameters(), lr=0.002)
+lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    opt,
+    mode="min",
+    factor=0.25,
+    patience=2,
+    threshold=0.001,
+    threshold_mode="abs",
+)
+lr_scheduler_config = {
+    "scheduler": lr_scheduler,
+    "interval": "epoch",
+    "frequency": 1,
+    "monitor": "val_loss",
+    "strict": True,
+}
+model.set_optimizer(opt, lr_scheduler_config)
 
 # train!
 tracking_uri = "/explore/nobackup/people/dgershm1/mlruns"
 
 with mlf.start_run(
     tracking_uri=tracking_uri,
-    experiment_name="+".join(targets.keys()),
+    experiment_name="+".join(spec.targets.keys()),
     log_datasets=False,
 ) as run:
     mlf_logger = MLFlowLogger(
         tracking_uri=tracking_uri,
         run_id=run.info.run_id,
-        log_model=True,
+        log_model="all",
     )
-
-    train.log("train")
-    val.log("val")
-    test.log("test")
 
     trainer = L.Trainer(
         enable_progress_bar=True,
-        max_epochs=1,
+        max_epochs=25,
         enable_model_summary=True,
         logger=mlf_logger,
+        callbacks=[
+            callbacks.EarlyStopping(monitor="val_loss", min_delta=0.001, patience=5),
+            callbacks.LearningRateMonitor(),
+            callbacks.RichProgressBar(),
+        ],
     )
 
-    trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+    trainer.fit(model=model, datamodule=datamodule)

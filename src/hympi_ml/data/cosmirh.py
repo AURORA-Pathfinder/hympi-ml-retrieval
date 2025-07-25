@@ -5,10 +5,10 @@ import torch
 
 from hympi_ml.data import DataSpec, DataSource, RFBand
 
-C50_BAND = RFBand(low=50.0019, high=57.99799375, channel_width=0.00390625)
+C50_BAND = RFBand(low=50.001953, high=57.998047, channel_width=0.00390625)
 """The 50 GHz band of CoSMIR-H from ~50-58 GHz containing 2048 individual channels."""
 
-C183_BAND = RFBand(low=175.3120, high=191.30809375, channel_width=0.00390625)
+C183_BAND = RFBand(low=175.311953, high=191.308047, channel_width=0.00390625)
 """The 183 GHz band of CoSMIR-H from ~175-192 GHz containing 4096 individual channels."""
 
 WINDOW_CHANNELS = [89.00, 165.30]
@@ -101,7 +101,7 @@ class CosmirhSpec(DataSpec):
 
         return source.ch[start:end]
 
-    def apply_batch(self, batch) -> torch.Tensor:
+    def transform_batch(self, batch) -> torch.Tensor:
         indices_tensor = torch.tensor(self.indices, device=batch.device)
         batch = torch.index_select(batch, dim=1, index=indices_tensor)
-        return super().apply_batch(batch)
+        return super().transform_batch(batch)

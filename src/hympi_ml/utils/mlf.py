@@ -1,9 +1,9 @@
 """A useful set of utility functions that wrap around common MLFlow functionality."""
 
+import os
 import glob
 
 import mlflow
-from mlflow.data.dataset import Dataset
 from mlflow.tracking._tracking_service.client import TrackingServiceClient
 
 from matplotlib.figure import Figure
@@ -48,7 +48,7 @@ def get_artifacts_uri(run_id: str) -> str:
 
 def get_checkpoint_path(run_id: str, step: int | None = None) -> str:
     """Returns the path of the PyTorch LightningModule checkpoint at the provided step.
-    If no step is provided, then it will find the latest checkpoint saved in this run.
+    If no step is provided, then it will find the best or latest checkpoint saved in this run.
 
     Args:
         run_id (str): The id of the mlflow run.
@@ -59,50 +59,29 @@ def get_checkpoint_path(run_id: str, step: int | None = None) -> str:
     """
     artifacts_uri = get_artifacts_uri(run_id)[7:]
 
+    best_path = f"{artifacts_uri}/checkpoints/latest_checkpoint.pth"
+    if os.path.exists(best_path):
+        return best_path
+
     step_str = step or "*"
     files = glob.glob(f"{artifacts_uri}/*/epoch=*-step={step_str}*.ckpt")
     return sorted(files)[0]
 
 
-def get_datasets_by_context(run_id: str) -> dict[str, Dataset]:
-    """
-    Given a run_id, this function gathers the datasets in an mlflow run and
-    creates a dictionary with dataset's context tag as the key and the generic mflow dataset
-    itself as the value.
-
-    Args:
-        run_id (str): The run id of the mlflow run
-
-    Returns:
-        dict[str, mlflow.data.Dataset]: The dictionary whos keys are the context tag of the dataset value
-    """
-    run = mlflow.get_run(run_id)
-
-    dataset_dict = {}
-
-    for dataset_input in run.inputs.dataset_inputs:
-        context = "unknown"
-
-        for tag in dataset_input.tags:
-            if tag.key == "mlflow.data.context":
-                context = tag.value
-        dataset_dict.update({context: dataset_input.dataset})
-
-    return dataset_dict
-
-
-def log_figure(fig: Figure, artifact_file: str | None = None):
+def log_figure(
+    fig: Figure,
+    artifact_path: str,
+    run_id: str | None = None,
+):
     """
     Logs a figure to mlflow. This function wraps the standanrd log_figure function in mlflow but
     makes the file path optional as it is automatically calculates based on the title of the figure.
 
     Args:
         fig (Figure): The figure to log.
-        artifact_file (str | None): The relative artifact file path where the figure is saved.
-            If None, will be placed in the main artifact directory as a png with the title of the figure.
-            Defaults to None.
+        artifact_path (str): The path in the artifacts file where the file is saved.
+        run_id (str | None): The run_id of the run to log the figure to. If None, will log to the current run.
     """
-    if artifact_file is None:
-        artifact_file = f"{fig.get_suptitle()}.png"
-
-    mlflow.log_figure(fig, artifact_file)
+    local_path = f"/tmp/{os.path.basename(artifact_path)}"
+    fig.savefig(local_path)
+    mlflow.log_artifact(local_path, f"{os.path.dirname(artifact_path)}", run_id=run_id)

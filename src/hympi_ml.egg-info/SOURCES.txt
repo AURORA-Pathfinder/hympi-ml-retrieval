@@ -11,12 +11,14 @@ src/hympi_ml/data/__init__.py
 src/hympi_ml/data/ampr.py
 src/hympi_ml/data/atms.py
 src/hympi_ml/data/base.py
+src/hympi_ml/data/batches.py
 src/hympi_ml/data/ch06.py
 src/hympi_ml/data/cosmirh.py
+src/hympi_ml/data/filter.py
 src/hympi_ml/data/memmap.py
-src/hympi_ml/data/model_dataset.py
 src/hympi_ml/data/nature_run.py
 src/hympi_ml/data/rfband.py
+src/hympi_ml/data/scale.py
 src/hympi_ml/evaluation/__init__.py
 src/hympi_ml/evaluation/figs.py
 src/hympi_ml/evaluation/metrics.py
