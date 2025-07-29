@@ -28,6 +28,10 @@ extras = {
         dataset="PBLH",
         filter=SimpleRangeFilter(minimum=200, maximum=500),
     ),
+    "LATITUDE": NRSpec(
+        dataset="LATITUDE",
+        filter=SimpleRangeFilter(minimum=0, maximum=90),
+    ),
 }
 
 raw_data.spec.extras = extras

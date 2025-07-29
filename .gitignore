@@ -11,6 +11,6 @@ outputs/
 .vscode
 .ruff_cache
 .trash
-*.egg-info
+*.egg-info/
 *lightning_logs
 *.out

@@ -16,6 +16,7 @@ from hympi_ml.data import (
 )
 
 from hympi_ml.data.scale import MinMaxScaler
+from hympi_ml.data.filter import SimpleRangeFilter
 
 from hympi_ml.data.ch06 import Ch06Source
 from hympi_ml.model import MLPModel
@@ -39,9 +40,10 @@ spec = ModelDataSpec(
         # "AMPR": AMPRSpec(),
     },
     targets={
-        "TEMPERATURE": NRSpec(
-            dataset="TEMPERATURE",
-            scaler=MinMaxScaler(minimum=175.0, maximum=325.0),
+        "PBLH": NRSpec(
+            dataset="PBLH",
+            scaler=MinMaxScaler(minimum=200, maximum=2000),
+            filter=SimpleRangeFilter(minimum=200, maximum=2000),
         ),
     },
 )
@@ -69,7 +71,7 @@ datamodule = RawDataModule(
 
 # metrics setup
 train_metrics = {
-    "TEMPERATURE": MetricCollection(
+    "PBLH": MetricCollection(
         {
             "mae": re.MeanAbsoluteError(),
         },
@@ -77,7 +79,7 @@ train_metrics = {
 }
 
 val_metrics = {
-    "TEMPERATURE": MetricCollection(
+    "PBLH": MetricCollection(
         {
             "mae": re.MeanAbsoluteError(),
             "mse": re.MeanSquaredError(),
@@ -87,7 +89,7 @@ val_metrics = {
 }
 
 test_metrics = {
-    "TEMPERATURE": MetricCollection(
+    "PBLH": MetricCollection(
         {
             "mae": re.MeanAbsoluteError(),
             "mse": re.MeanSquaredError(),
@@ -105,7 +107,7 @@ model = MLPModel(
     feature_paths=nn.ModuleDict(
         {
             "CH": nn.Sequential(
-                nn.LazyLinear(1024),
+                nn.LazyLinear(512),
                 nn.GELU(),
                 nn.LazyLinear(256),
                 nn.GELU(),
@@ -119,7 +121,9 @@ model = MLPModel(
         }
     ),
     output_path=nn.Sequential(
-        nn.LazyLinear(128),
+        nn.LazyLinear(64),
+        nn.GELU(),
+        nn.LazyLinear(16),
         nn.GELU(),
     ),
 )

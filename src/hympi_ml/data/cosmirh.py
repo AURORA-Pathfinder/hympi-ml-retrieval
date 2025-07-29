@@ -49,7 +49,7 @@ class CosmirhSpec(DataSpec):
                 all_freqs.add(f)
 
         indices: list[int] = []
-
+        
         for freq in all_freqs:
             ignore = False
 
@@ -69,13 +69,17 @@ class CosmirhSpec(DataSpec):
                 indices.append(C183_BAND.index(freq) + 2048)
             elif freq in WINDOW_CHANNELS:
                 indices.append(WINDOW_CHANNELS.index(freq) + 2048 + 4096)
-
-            indices = sorted(indices)
-
+            else:
+                print(f"WARNING: Frequency {freq} is not found in cosmirh data!")
+                
+        if self.ignore_frequencies is not None:
+            if len(indices) > len(all_freqs) - len(self.ignore_frequencies):
+                print("WARNING: Some ignored frequencies were not removed or found properly.")
+        
         if indices == []:
             raise Exception("No data found to match the provided set of frequencies.")
 
-        return indices
+        return sorted(indices)
 
     @property
     def indices(self) -> list[int]:

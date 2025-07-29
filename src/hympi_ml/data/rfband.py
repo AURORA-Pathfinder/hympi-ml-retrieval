@@ -53,12 +53,9 @@ class RFBand(BaseModel):
                 "No channel width provided for this band. Cannot convert to any array without a channel width."
             )
 
-        order = len(str(self.channel_width).split(".")[1])
+        ha_freqs = np.arange(self.low, self.high, step=self.channel_width)
 
-        stop = round(self.high + self.channel_width, order)
-        ha_freqs = np.arange(self.low, stop, step=self.channel_width)
-
-        return [float(round(f, order)) for f in ha_freqs]
+        return [float(round(f, self._order)) for f in ha_freqs]
 
     def index(self, f: float) -> int:
         """Finds the index where the provided frequency would be if the band was an array.

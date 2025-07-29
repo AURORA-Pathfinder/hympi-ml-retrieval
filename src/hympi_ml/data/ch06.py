@@ -53,47 +53,40 @@ class Ch06Source(
     def ampr(self) -> MemmapSequence:
         return MemmapSequence(self._load_memmaps("AP"))
 
-    @property
-    def nr_temperature(self) -> MemmapSequence:
+    def _load_nr_table(self, index: int) -> MemmapSequence:
         seq = []
         for table in self._load_memmaps("nature_table"):
-            seq.append(table[:, :, 1])
+            seq.append(table[:, :, index])
 
         return MemmapSequence(seq)
 
-    @property
-    def nr_water_vapor(self) -> MemmapSequence:
+    def _load_nr_scalar(self, index: int) -> MemmapSequence:
         seq = []
-        for table in self._load_memmaps("nature_table"):
-            seq.append(table[:, :, 2])
+        for table in self._load_memmaps("nature_scalar"):
+            seq.append(table[:, index])
 
         return MemmapSequence(seq)
 
     @property
     def nr_pressure(self) -> MemmapSequence:
-        seq = []
-        for table in self._load_memmaps("nature_table"):
-            seq.append(table[:, :, 0])
+        return self._load_nr_table(0)
 
-        return MemmapSequence(seq)
+    @property
+    def nr_temperature(self) -> MemmapSequence:
+        return self._load_nr_table(1)
+
+    @property
+    def nr_water_vapor(self) -> MemmapSequence:
+        return self._load_nr_table(2)
 
     @property
     def nr_pblh(self) -> MemmapSequence:
-        seq = []
-        for scalar in self._load_memmaps("nature_scalar"):
-            seq.append(scalar[:, 13])
-
-        return MemmapSequence(seq)
+        return self._load_nr_scalar(13)
 
     @property
-    def nr_latlon(self) -> tuple[MemmapSequence, MemmapSequence]:
-        lats = []
-        lons = []
-        for scalar in self._load_memmaps("nature_scalar"):
-            lats.append(scalar[:, 0])
-            lons.append(scalar[:, 1])
+    def nr_latitude(self) -> MemmapSequence:
+        return self._load_nr_scalar(0)
 
-        lat_ds = MemmapSequence(lats)
-        lon_ds = MemmapSequence(lons)
-
-        return (lat_ds, lon_ds)
+    @property
+    def nr_longitude(self) -> MemmapSequence:
+        return self._load_nr_scalar(1)
