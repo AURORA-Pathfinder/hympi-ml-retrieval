@@ -25,7 +25,7 @@ def load_raw_slice(self, source: DataSource, start: int, end: int) -> Sequence:
 ```
 As a name implies, this method loads up a raw slice of data. This slice has a start and end index and uses a `DataSource` to do the slicing.
 
-*Use of the word "raw" here refers to the idea that the data being loaded from the source is not transformed or filtered in anyway. It comes directly from the source in question.*
+*Use of the word "raw" here refers to the data being loaded directly from the source and is not transformed or filtered in any way. The actually transforming happens on the GPU in the model training / validation / testing. It can be done manually, of course, using functions defined in `ModelDataSpec` to apply transformations to a raw batch of data following that spec.*
 
 All DataSpec's must implement the above function to work with a specific `DataSource` or with a range of them as needed. That specific `DataSource` is then used to do the initial loading that will return a sequence of samples from the data source from start to end.
 

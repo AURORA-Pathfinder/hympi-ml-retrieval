@@ -13,7 +13,8 @@ C183_BAND = RFBand(low=175.311953, high=191.308047, channel_width=0.00390625)
 
 WINDOW_CHANNELS = [89.00, 165.30]
 """The 4 window channels of CoSMIR-H data. Note that this list only contains the pure frequency values (two floats)
-as each frequency is horizontally and vertically polarized"""
+as each frequency is horizontally and vertically polarized. 
+If a window channel is a frequency in a CosmirhSpec, it will select both horizontal and vertical polarized samples."""
 
 
 class CosmirhSource(DataSource):
@@ -49,7 +50,7 @@ class CosmirhSpec(DataSpec):
                 all_freqs.add(f)
 
         indices: list[int] = []
-        
+
         for freq in all_freqs:
             ignore = False
 
@@ -68,14 +69,22 @@ class CosmirhSpec(DataSpec):
             elif freq in C183_BAND:
                 indices.append(C183_BAND.index(freq) + 2048)
             elif freq in WINDOW_CHANNELS:
-                indices.append(WINDOW_CHANNELS.index(freq) + 2048 + 4096)
+                # Add both (horizontal and vertical polarized) values for a given window channel frequency
+                if freq == 89.00:
+                    indices.append(6144)
+                    indices.append(6145)
+                elif freq == 169.00:
+                    indices.append(6146)
+                    indices.append(6147)
             else:
                 print(f"WARNING: Frequency {freq} is not found in cosmirh data!")
-                
+
         if self.ignore_frequencies is not None:
             if len(indices) > len(all_freqs) - len(self.ignore_frequencies):
-                print("WARNING: Some ignored frequencies were not removed or found properly.")
-        
+                print(
+                    "WARNING: Some ignored frequencies were not removed or found properly."
+                )
+
         if indices == []:
             raise Exception("No data found to match the provided set of frequencies.")
 
@@ -105,7 +114,16 @@ class CosmirhSpec(DataSpec):
 
         return source.ch[start:end]
 
-    def transform_batch(self, batch) -> torch.Tensor:
+    def _select_frequencies(self, batch: torch.Tensor) -> torch.Tensor:
+        """
+        Selects frequencies (for each sample in the provided batch) from the indices calculated based
+        on the frequencies and ignore frequencies defined in this spec.
+
+        Returns the new, selected batch of data.
+        """
         indices_tensor = torch.tensor(self.indices, device=batch.device)
-        batch = torch.index_select(batch, dim=1, index=indices_tensor)
+        return torch.index_select(batch, dim=1, index=indices_tensor)
+
+    def transform_batch(self, batch: torch.Tensor) -> torch.Tensor:
+        batch = self._select_frequencies(batch)
         return super().transform_batch(batch)

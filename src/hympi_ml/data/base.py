@@ -140,6 +140,9 @@ class ModelDataSpec(BaseModel):
         return transformed_features, transformed_targets, transformed_extras
 
     def unscale_batch(self, scaled_batch):
+        """
+        Takes in a scaled batch of data based on this spec and unscales each part based on their scalers.
+        """
         scaled_features, scaled_targets, scaled_extras = scaled_batch
 
         unscaled_features = {
@@ -162,6 +165,10 @@ class ModelDataSpec(BaseModel):
         return unscaled_features, unscaled_targets, unscaled_extras
 
     def unscale_targets(self, scaled_targets):
+        """
+        Takes a set of scaled targets and unscales them based on the targets defined in this spec.
+        Often useful just before metric calculations!
+        """
         return {
             k: self.targets[k].unscale_batch(scaled_targets[k])
             for k in self.targets.keys()

@@ -75,8 +75,10 @@ class NRSpec(DataSpec):
             )
 
         match self.dataset:
-            case "LATLON":
-                return source.nr_latlon[start:end]
+            case "LATITUDE":
+                return source.nr_latitude[start:end]
+            case "LONGITUDE":
+                return source.nr_longitude[start:end]
             case "PBLH":
                 return source.nr_pblh[start:end]
 
