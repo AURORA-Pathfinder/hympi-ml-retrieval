@@ -6,7 +6,11 @@ outputs/
 *.npz
 *.h5
 *.keras
+*.ckpt
 .venv
 .vscode
 .ruff_cache
 .trash
+*.egg-info/
+*lightning_logs
+*.out
