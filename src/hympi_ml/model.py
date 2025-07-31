@@ -141,10 +141,6 @@ class MLPModel(SpecModel):
             }
         )
 
-        # self.example_input_array = {
-        #     k: torch.zeros(feature.shape) for k, feature in self.spec.features.items()
-        # }
-
     def forward(self, inputs):
         # go through all feature paths for each feature and combine them into one tensor
         features_forward = [

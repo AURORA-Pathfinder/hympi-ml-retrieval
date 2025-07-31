@@ -37,7 +37,6 @@ spec = ModelDataSpec(
                 57.61523425,
             ],
         ),
-        # "AMPR": AMPRSpec(),
     },
     targets={
         "PBLH": NRSpec(
@@ -114,10 +113,6 @@ model = MLPModel(
                 nn.LazyLinear(128),
                 nn.GELU(),
             ),
-            # "AMPR": nn.Sequential(
-            #     nn.LazyLinear(8),
-            #     nn.GELU(),
-            # ),
         }
     ),
     output_path=nn.Sequential(
@@ -139,6 +134,7 @@ lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     threshold=0.001,
     threshold_mode="abs",
 )
+
 lr_scheduler_config = {
     "scheduler": lr_scheduler,
     "interval": "epoch",
