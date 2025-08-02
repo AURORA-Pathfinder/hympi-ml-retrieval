@@ -2,6 +2,8 @@
 
 This code contains everything necessary to build neural networks for retrieving atmospheric parameters such as temperature and humidity profiles or planetary boundary layer height.
 
+#### *Submitted to IEEE TRANSACTIONS ON GEOSCIENCE AND REMOTE SENSING: Improved Planetary Boundary Layer Sounding Using Hyperspectral Microwave and Backscatter Lidar Data Fusion*
+
 Features include:
 - Comprehensive and expandable data specifications system for defining model variations.
 - Deep integration with PyTorch and PyTorch Lightning for training and serialization with checkpoints.
